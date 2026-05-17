@@ -1,0 +1,16 @@
+[package]
+name = "auditx-veridoc-desktop"
+version = "0.1.0"
+edition = "2021"
+description = "AuditX VeriDoc desktop audit application"
+
+[package.metadata.tauri-winres]
+OriginalFilename = "AuditX VeriDoc.exe"
+FileDescription = "AuditX VeriDoc desktop audit application"
+ProductName = "AuditX VeriDoc"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }

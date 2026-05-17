@@ -1,0 +1,30 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "AuditX VeriDoc",
+  "version": "0.1.0",
+  "identifier": "com.auditx.veridoc",
+  "build": {
+    "beforeDevCommand": "npm.cmd --prefix frontend run dev",
+    "beforeBuildCommand": "npm.cmd --prefix frontend run build",
+    "devUrl": "http://127.0.0.1:5173",
+    "frontendDist": "frontend/dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "AuditX / VeriDoc",
+        "width": 1440,
+        "height": 960,
+        "minWidth": 1180,
+        "minHeight": 760
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all"
+  }
+}
