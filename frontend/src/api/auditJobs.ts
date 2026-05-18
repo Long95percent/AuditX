@@ -18,7 +18,16 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
 
   if (!response.ok) {
     const detail = await response.text();
-    throw new Error(`Audit API request failed: ${response.status} ${detail}`);
+    let message = detail;
+    try {
+      const payload = JSON.parse(detail) as { detail?: unknown };
+      if (typeof payload.detail === "string") {
+        message = payload.detail;
+      }
+    } catch {
+      message = detail;
+    }
+    throw new Error(`Audit API request failed: ${response.status} ${message}`);
   }
 
   return response.json() as Promise<T>;
@@ -34,3 +43,4 @@ export async function createAuditJob(filePath: string): Promise<AuditJob> {
 export async function getHealthStatus(): Promise<HealthStatus> {
   return requestJson<HealthStatus>("/health");
 }
+

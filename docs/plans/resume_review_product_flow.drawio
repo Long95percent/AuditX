@@ -1,0 +1,98 @@
+﻿<mxfile host="app.diagrams.net" modified="2026-05-18T19:40:00.000Z" agent="Codex" version="24.7.17" type="device">
+  <diagram id="resume-review-flow" name="简历审查产品流程">
+    <mxGraphModel dx="1800" dy="1100" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="1100" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="title" value="简历审查效率工具：线性主流程 + 可展开细节" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=22;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="40" y="20" width="700" height="40" as="geometry" />
+        </mxCell>
+
+        <mxCell id="start" value="HR 输入 / 选择" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E3F2FD;strokeColor=#1565C0;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="40" y="110" width="150" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="input" value="简历库筛选或新上传&lt;br&gt;X 份简历 + 岗位信息&lt;br&gt;JD / 岗位模板 / 招聘人数 N" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E3F2FD;strokeColor=#1565C0" vertex="1" parent="1">
+          <mxGeometry x="240" y="100" width="210" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="parse" value="文档解析" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#2E7D32;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="500" y="110" width="160" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="orchestrator" value="AgentOrchestrator&lt;br&gt;统一审查主路由" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF3E0;strokeColor=#EF6C00;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="710" y="100" width="190" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="scoring" value="评分 + 风险审查" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF3E0;strokeColor=#EF6C00;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="950" y="110" width="170" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="topn" value="自动挑选 Top N" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E5F5;strokeColor=#6A1B9A;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="1170" y="110" width="170" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="layer" value="候选人分层" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E5F5;strokeColor=#6A1B9A;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="1390" y="110" width="160" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="present" value="HR 查看与筛选" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E0F7FA;strokeColor=#00838F;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="500" y="320" width="180" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="select" value="HR 选择候选" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E0F7FA;strokeColor=#00838F;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="740" y="320" width="170" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="pool" value="放入岗位候选库&lt;br&gt;更新简历状态" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8EAF6;strokeColor=#283593;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="970" y="320" width="190" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="jobdetail" value="输入与岗位细节&lt;br&gt;• 简历库筛选 / 新上传&lt;br&gt;• 按时间排序&lt;br&gt;• 只看新简历&lt;br&gt;• 岗位模板版本&lt;br&gt;• 优势词典&lt;br&gt;• 默认 N / HR 自定义 N" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E3F2FD;strokeColor=#1565C0;align=left;spacingLeft=10" vertex="1" parent="1">
+          <mxGeometry x="240" y="230" width="230" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="parsedetail" value="解析输出&lt;br&gt;ParsedDocument&lt;br&gt;• page_number&lt;br&gt;• block_id&lt;br&gt;• text&lt;br&gt;• bbox&lt;br&gt;• OCR 置信度" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#2E7D32;align=left;spacingLeft=10" vertex="1" parent="1">
+          <mxGeometry x="500" y="220" width="190" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="agentdetail" value="Agent 细节&lt;br&gt;• 简历结构理解&lt;br&gt;• 岗位匹配分析&lt;br&gt;• 风险候选发现&lt;br&gt;• 证据查找&lt;br&gt;• 报告摘要" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF3E0;strokeColor=#EF6C00;align=left;spacingLeft=10" vertex="1" parent="1">
+          <mxGeometry x="710" y="220" width="200" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="scoredetail" value="计算细节&lt;br&gt;• 基础完整性&lt;br&gt;• 岗位硬性要求&lt;br&gt;• 能力匹配&lt;br&gt;• 经历相关性&lt;br&gt;• 优势信号&lt;br&gt;• 风险扣分" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF3E0;strokeColor=#EF6C00;align=left;spacingLeft=10" vertex="1" parent="1">
+          <mxGeometry x="950" y="220" width="190" height="170" as="geometry" />
+        </mxCell>
+        <mxCell id="topndetail" value="Top N 逻辑&lt;br&gt;• 默认 N 可配置&lt;br&gt;• HR 可手动输入 N&lt;br&gt;• 综合排序分&lt;br&gt;• 未入选仍可查看&lt;br&gt;• 可重新生成候选池" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E5F5;strokeColor=#6A1B9A;align=left;spacingLeft=10" vertex="1" parent="1">
+          <mxGeometry x="1170" y="220" width="190" height="150" as="geometry" />
+        </mxCell>
+        <mxCell id="layerdetail" value="分层结果&lt;br&gt;• 最优&lt;br&gt;• 次优但有潜力&lt;br&gt;• 不建议&lt;br&gt;• 有风险但优势强：需复核&lt;br&gt;• 不一票否决" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E5F5;strokeColor=#6A1B9A;align=left;spacingLeft=10" vertex="1" parent="1">
+          <mxGeometry x="1390" y="220" width="190" height="150" as="geometry" />
+        </mxCell>
+
+        <mxCell id="risk" value="风险证据面板&lt;br&gt;HR 点击风险点可查看：&lt;br&gt;• 简历原文行 / block&lt;br&gt;• 风险描述&lt;br&gt;• 对分数影响&lt;br&gt;• Agent 查找过程&lt;br&gt;• 本地证据链接" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFEBEE;strokeColor=#C62828;align=left;spacingLeft=10" vertex="1" parent="1">
+          <mxGeometry x="40" y="500" width="300" height="180" as="geometry" />
+        </mxCell>
+        <mxCell id="trace" value="内部计算过程 / Trace&lt;br&gt;默认折叠，按需展开：&lt;br&gt;• Agent steps&lt;br&gt;• Tool calls&lt;br&gt;• Rule calls&lt;br&gt;• FindingCandidate&lt;br&gt;• rejected candidates" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F5F5F5;strokeColor=#616161;align=left;spacingLeft=10" vertex="1" parent="1">
+          <mxGeometry x="390" y="500" width="300" height="180" as="geometry" />
+        </mxCell>
+        <mxCell id="localEvidence" value="证据与复用来源&lt;br&gt;• 简历原文&lt;br&gt;• JD / 岗位模板&lt;br&gt;• 本地公司模拟库&lt;br&gt;• 已筛查简历可复用解析/结构化/历史证据&lt;br&gt;• rank / Top N / 分层必须重算" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFDE7;strokeColor=#F9A825;align=left;spacingLeft=10" vertex="1" parent="1">
+          <mxGeometry x="740" y="500" width="300" height="180" as="geometry" />
+        </mxCell>
+        <mxCell id="tests" value="测试与压测&lt;br&gt;• 黄金测试集&lt;br&gt;• 生成批量简历&lt;br&gt;• Agent 路由测试&lt;br&gt;• Evidence 校验&lt;br&gt;• 单日 5000 份压测" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#EDE7F6;strokeColor=#4527A0;align=left;spacingLeft=10" vertex="1" parent="1">
+          <mxGeometry x="1090" y="500" width="300" height="180" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;endArrow=block;endFill=1" edge="1" parent="1" source="start" target="input"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;endArrow=block;endFill=1" edge="1" parent="1" source="input" target="parse"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;endArrow=block;endFill=1" edge="1" parent="1" source="parse" target="orchestrator"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;endArrow=block;endFill=1" edge="1" parent="1" source="orchestrator" target="scoring"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;endArrow=block;endFill=1" edge="1" parent="1" source="scoring" target="topn"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;endArrow=block;endFill=1" edge="1" parent="1" source="topn" target="layer"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;endArrow=block;endFill=1" edge="1" parent="1" source="layer" target="present"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1470" y="355" /><mxPoint x="590" y="355" /></Array></mxGeometry></mxCell>
+        <mxCell id="e8" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;endArrow=block;endFill=1" edge="1" parent="1" source="present" target="select"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="e9" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;endArrow=block;endFill=1" edge="1" parent="1" source="select" target="pool"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="d1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;endArrow=open;endFill=0" edge="1" parent="1" source="input" target="jobdetail"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="d2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;endArrow=open;endFill=0" edge="1" parent="1" source="parse" target="parsedetail"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="d3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;endArrow=open;endFill=0" edge="1" parent="1" source="orchestrator" target="agentdetail"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="d4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;endArrow=open;endFill=0" edge="1" parent="1" source="scoring" target="scoredetail"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="d5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;endArrow=open;endFill=0" edge="1" parent="1" source="topn" target="topndetail"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="d6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;endArrow=open;endFill=0" edge="1" parent="1" source="layer" target="layerdetail"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="d7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;endArrow=open;endFill=0" edge="1" parent="1" source="present" target="risk"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="d8" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;endArrow=open;endFill=0" edge="1" parent="1" source="present" target="trace"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="d9" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;endArrow=open;endFill=0" edge="1" parent="1" source="orchestrator" target="localEvidence"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="805" y="455" /><mxPoint x="890" y="455" /></Array></mxGeometry></mxCell>
+        <mxCell id="d10" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;dashed=1;endArrow=open;endFill=0" edge="1" parent="1" source="scoring" target="tests"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1035" y="455" /><mxPoint x="1240" y="455" /></Array></mxGeometry></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

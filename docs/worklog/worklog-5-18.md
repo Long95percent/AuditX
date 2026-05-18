@@ -91,3 +91,33 @@
 - Updated `frontend/src/app/App.tsx` to auto-check backend health on load, expose a `Check Backend` action, and check health before running fake audit.
 - Added online/offline status styling and updated README desktop acceptance notes.
 - Verification after backend health UI: backend tests passed, script checks passed, frontend build passed, Tauri `cargo check` passed, and `start_desktop.ps1 -SkipInstall` probe reported `backend_health=ok` while Tauri stayed running for 45 seconds.
+
+## 2026-05-18 MVP Step 1: desktop file picker
+- User approved technical choice B: use the Tauri Dialog plugin for real desktop file selection.
+- Goal for this step: let the desktop UI choose a local document path and pass that selected path into the existing fake audit job creation flow.
+- This intentionally does not implement real PDF parsing/OCR yet; it upgrades the MVP input from hardcoded `demo_resume.pdf` to a user-selected desktop file path.
+- Implementing MVP Step 1 after user approval of Tauri Dialog plugin technical choice.
+- Added Tauri dialog integration points: Rust dependency, plugin registration, default capability permission, and frontend package dependency declaration.
+- Updated desktop UI to choose a local document with the native Tauri file dialog and pass that selected path to the existing fake audit API.
+- The audit remains fake/parser-free for this step; this upgrades the MVP input from hardcoded demo path to user-selected local path.
+- Tauri capability parser rejected the newly-created `src-tauri/capabilities/default.json` when it was written with PowerShell's default UTF-8 BOM.
+- User approved rewriting only this newly-created capability file as UTF-8 without BOM; no existing project file encoding was converted for this step.
+- Installed/synced frontend npm dependency `@tauri-apps/plugin-dialog` after user-approved technical choice.
+- Synced Rust dependency `tauri-plugin-dialog` and updated `src-tauri/Cargo.lock` through `cargo check`.
+- Verification for MVP Step 1: backend tests passed, script checks passed, frontend build passed, Tauri `cargo check` passed, and `start_desktop.ps1 -SkipInstall` probe reported `backend_health=ok` while the desktop stayed running for 45 seconds.
+- Manual user check still needed: click `Choose Document` in the desktop app, select a local PDF/DOC/TXT, then click `Run Fake Audit` and confirm the selected path is shown in the UI.
+
+## 2026-05-18 MVP Step 2: backend file path validation
+- User confirmed MVP Step 1 desktop native file picker works.
+- Next step chosen without new technical dependencies: validate selected local file paths on the backend before creating fake audit jobs.
+- Goal: if the selected path does not exist or is not a file, API returns a clear client error instead of silently auditing a bad path.
+- Implemented MVP Step 2: backend file path validation before fake audit job creation.
+- Updated API tests to use a real fixture file and added missing-file plus directory rejection coverage.
+- `POST /api/audit-jobs` now returns `400 Selected document does not exist` for missing files and `400 Selected document is not a file` for directories.
+- Improved frontend API error parsing so FastAPI JSON `detail` messages are displayed clearly in the desktop UI.
+- Verification after MVP Step 2: backend tests passed with 9 tests, script checks passed with 4 tests, frontend build passed, and Tauri `cargo check` passed.
+
+## 2026-05-18 File parsing plan
+- User requested scheme C-level file parsing/rendering/OCR planning and explicitly asked to write a plan document before implementation.
+- Created `docs/文件解析plan.md` with a full implementation plan, technical decision gates, task breakdown, tests, and verification steps.
+- No production code was changed for this planning step.

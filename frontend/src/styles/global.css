@@ -230,3 +230,28 @@ h1 {
   color: #ffd4d4;
   background: rgba(255, 76, 76, 0.12);
 }
+
+.selected-file-panel {
+  display: grid;
+  gap: 6px;
+  max-width: 920px;
+  margin-top: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 18px;
+  padding: 14px 16px;
+  background: rgba(5, 10, 24, 0.22);
+}
+
+.selected-file-label {
+  color: rgba(255, 255, 255, 0.52);
+  font-size: 0.78rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.selected-file-panel code {
+  overflow-wrap: anywhere;
+  color: rgba(255, 255, 255, 0.66);
+  font-family: "Cascadia Code", Consolas, monospace;
+  font-size: 0.86rem;
+}

@@ -14,7 +14,8 @@
                          "vite":  "latest",
                          "typescript":  "latest",
                          "react":  "latest",
-                         "react-dom":  "latest"
+                         "react-dom":  "latest",
+                         "@tauri-apps/plugin-dialog":  "^2"
                      },
     "devDependencies":  {
                             "@types/react":  "latest",
@@ -22,3 +23,4 @@
                             "@tauri-apps/cli":  "^2"
                         }
 }
+

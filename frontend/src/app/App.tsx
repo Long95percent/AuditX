@@ -1,18 +1,27 @@
-﻿import { useEffect, useState } from "react";
+﻿import { open } from "@tauri-apps/plugin-dialog";
+import { useEffect, useState } from "react";
 
 import { createAuditJob, getHealthStatus, type HealthStatus } from "../api/auditJobs";
 import type { AuditJob } from "../types/audit";
-
-const DEMO_FILE_PATH = "demo_resume.pdf";
 
 function formatBBox(bbox: { x0: number; y0: number; x1: number; y1: number }) {
   return `x0=${bbox.x0}, y0=${bbox.y0}, x1=${bbox.x1}, y1=${bbox.y1}`;
 }
 
+function displayFileName(filePath: string | null) {
+  if (!filePath) {
+    return "No document selected";
+  }
+  const parts = filePath.split(/[\\/]/);
+  return parts[parts.length - 1] || filePath;
+}
+
 export function App() {
+  const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
   const [job, setJob] = useState<AuditJob | null>(null);
   const [health, setHealth] = useState<HealthStatus | null>(null);
   const [isCheckingHealth, setIsCheckingHealth] = useState(false);
+  const [isPickingFile, setIsPickingFile] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -38,14 +47,46 @@ export function App() {
     void refreshHealth();
   }, []);
 
+  async function handleChooseFile() {
+    setIsPickingFile(true);
+    setError(null);
+
+    try {
+      const selected = await open({
+        multiple: false,
+        directory: false,
+        filters: [
+          {
+            name: "Documents",
+            extensions: ["pdf", "doc", "docx", "txt"],
+          },
+        ],
+      });
+
+      if (typeof selected === "string") {
+        setSelectedFilePath(selected);
+        setJob(null);
+      }
+    } catch (pickError) {
+      setError(pickError instanceof Error ? pickError.message : "Unable to open file picker");
+    } finally {
+      setIsPickingFile(false);
+    }
+  }
+
   async function handleRunAudit() {
+    if (!selectedFilePath) {
+      setError("Choose a document before running the audit.");
+      return;
+    }
+
     setIsRunning(true);
     setError(null);
 
     try {
       const nextHealth = await getHealthStatus();
       setHealth(nextHealth);
-      const nextJob = await createAuditJob(DEMO_FILE_PATH);
+      const nextJob = await createAuditJob(selectedFilePath);
       setJob(nextJob);
     } catch (auditError) {
       setError(auditError instanceof Error ? auditError.message : "Unknown audit error");
@@ -67,7 +108,10 @@ export function App() {
           and Tauri sidecar orchestration.
         </p>
         <div className="audit-action-row">
-          <button className="primary-button" disabled={isRunning} onClick={handleRunAudit}>
+          <button className="secondary-button" disabled={isPickingFile} onClick={handleChooseFile}>
+            {isPickingFile ? "Choosing Document..." : "Choose Document"}
+          </button>
+          <button className="primary-button" disabled={isRunning || !selectedFilePath} onClick={handleRunAudit}>
             {isRunning ? "Running Fake Audit..." : "Run Fake Audit"}
           </button>
           <button className="secondary-button" disabled={isCheckingHealth} onClick={refreshHealth}>
@@ -78,13 +122,18 @@ export function App() {
           </span>
           <span className="status-pill">Audit: {job?.status ?? "not started"}</span>
         </div>
+        <div className="selected-file-panel">
+          <span className="selected-file-label">Selected document</span>
+          <strong>{displayFileName(selectedFilePath)}</strong>
+          {selectedFilePath ? <code>{selectedFilePath}</code> : null}
+        </div>
         {error ? <div className="error-panel">{error}</div> : null}
       </section>
 
       <section className="workspace-grid">
         <div className="glass-panel document-panel">
           <p className="panel-label">Document</p>
-          <h2>{job?.file_path ?? DEMO_FILE_PATH}</h2>
+          <h2>{job?.file_path ? displayFileName(job.file_path) : displayFileName(selectedFilePath)}</h2>
           <p>Document ID: {job?.document_id ?? "waiting for audit"}</p>
           <p>Rejected candidates: {job?.rejected_count ?? 0}</p>
         </div>
@@ -94,7 +143,7 @@ export function App() {
           <h2>{findings.length}</h2>
           <div className="findings-list">
             {findings.length === 0 ? (
-              <p className="muted-copy">No findings yet. Start the fake audit to load results.</p>
+              <p className="muted-copy">No findings yet. Choose a document and start the fake audit.</p>
             ) : (
               findings.map((finding) => (
                 <article className="finding-card" key={finding.finding_id}>
@@ -131,8 +180,9 @@ export function App() {
           <p className="panel-label">Audit Timeline</p>
           <ol className="timeline-list">
             <li>Desktop shell loaded on Vite dev server.</li>
+            <li>User chooses a local document through the Tauri native file dialog.</li>
             <li>Backend health is checked before audit execution.</li>
-            <li>Fake audit request posts to FastAPI at 127.0.0.1:8765.</li>
+            <li>Fake audit request posts the selected file path to FastAPI at 127.0.0.1:8765.</li>
             <li>Evidence validator accepts findings with traceable bbox evidence.</li>
           </ol>
         </div>

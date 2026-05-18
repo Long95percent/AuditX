@@ -1,4 +1,6 @@
-﻿from fastapi import APIRouter, Depends, HTTPException
+﻿from pathlib import Path
+
+from fastapi import APIRouter, Depends, HTTPException
 
 from auditx.api.dependencies import get_audit_job_service
 from auditx.api.schemas import AuditFindingsResponse, AuditJobResponse, CreateAuditJobRequest
@@ -12,6 +14,11 @@ def create_audit_job(
     request: CreateAuditJobRequest,
     service: AuditJobService = Depends(get_audit_job_service),
 ) -> AuditJobResponse:
+    document_path = Path(request.file_path)
+    if not document_path.exists():
+        raise HTTPException(status_code=400, detail="Selected document does not exist")
+    if not document_path.is_file():
+        raise HTTPException(status_code=400, detail="Selected document is not a file")
     return AuditJobResponse.model_validate(service.create_and_run(request.file_path))
 
 
@@ -35,3 +42,4 @@ def get_audit_job_findings(
     if findings is None:
         raise HTTPException(status_code=404, detail="Audit job not found")
     return AuditFindingsResponse(job_id=job_id, findings=findings)
+
