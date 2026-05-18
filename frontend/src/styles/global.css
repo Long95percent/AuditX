@@ -72,3 +72,161 @@ h1 {
   grid-column: 1 / -1;
   min-height: 160px;
 }
+
+.audit-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-top: 24px;
+}
+
+.primary-button {
+  border: 0;
+  border-radius: 999px;
+  padding: 12px 20px;
+  color: #07111f;
+  background: linear-gradient(135deg, #8ee7ff, #b9ffcf);
+  cursor: pointer;
+  font-weight: 700;
+  box-shadow: 0 16px 40px rgba(142, 231, 255, 0.22);
+}
+
+.primary-button:disabled {
+  cursor: wait;
+  opacity: 0.68;
+}
+
+.status-pill,
+.risk-badge {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 0.88rem;
+  text-transform: uppercase;
+}
+
+.error-panel {
+  margin-top: 18px;
+  border: 1px solid rgba(255, 108, 108, 0.45);
+  border-radius: 18px;
+  padding: 14px 16px;
+  background: rgba(255, 76, 76, 0.12);
+  color: #ffd4d4;
+}
+
+.panel-label {
+  margin: 0 0 10px;
+  color: rgba(255, 255, 255, 0.52);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.document-panel h2,
+.findings-panel h2 {
+  margin: 0 0 12px;
+}
+
+.muted-copy,
+.suggestion-copy,
+.timeline-list {
+  color: rgba(255, 255, 255, 0.68);
+}
+
+.findings-list {
+  display: grid;
+  gap: 14px;
+}
+
+.finding-card {
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 20px;
+  padding: 16px;
+  background: rgba(5, 10, 24, 0.3);
+}
+
+.finding-card-header {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.finding-card h3 {
+  margin: 0;
+}
+
+.finding-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+  color: rgba(255, 255, 255, 0.62);
+  font-size: 0.9rem;
+}
+
+.evidence-box {
+  border-left: 3px solid rgba(142, 231, 255, 0.75);
+  border-radius: 14px;
+  padding: 12px 14px;
+  background: rgba(142, 231, 255, 0.09);
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.risk-high {
+  color: #ffd4d4;
+  background: rgba(255, 76, 76, 0.16);
+}
+
+.risk-medium {
+  color: #ffe8a3;
+  background: rgba(255, 200, 87, 0.15);
+}
+
+.risk-low,
+.risk-info {
+  color: #c7f9d4;
+  background: rgba(114, 240, 151, 0.13);
+}
+
+.timeline-list {
+  margin: 0;
+  padding-left: 20px;
+}
+
+@media (max-width: 900px) {
+  .workspace-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.secondary-button {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  padding: 11px 18px;
+  color: rgba(255, 255, 255, 0.86);
+  background: rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.secondary-button:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
+.status-online {
+  border-color: rgba(114, 240, 151, 0.36);
+  color: #c7f9d4;
+  background: rgba(114, 240, 151, 0.13);
+}
+
+.status-offline {
+  border-color: rgba(255, 108, 108, 0.38);
+  color: #ffd4d4;
+  background: rgba(255, 76, 76, 0.12);
+}

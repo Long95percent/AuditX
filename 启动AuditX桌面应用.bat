@@ -4,8 +4,7 @@ cd /d "%~dp0"
 echo [AuditX] Starting desktop app...
 echo [AuditX] This window will stay open so you can see logs.
 
-
-npx tauri dev
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\start_desktop.ps1"
 set EXIT_CODE=%ERRORLEVEL%
 
 echo.

@@ -41,7 +41,9 @@ How to run it:
 Expected result:
 
 - A native Tauri desktop window opens.
-- The window shows the AuditX / VeriDoc glassmorphism desktop UI skeleton.
+- The window shows the AuditX / VeriDoc glassmorphism desktop UI.
+- The startup script starts the development FastAPI backend automatically when it is not already running.
+- The UI shows backend health and can run the Phase 1A fake audit loop.
 - This is the acceptance surface for the app.
 
 If dependencies have already been installed and you want a faster startup, double-click:
@@ -164,7 +166,7 @@ npm.cmd --prefix frontend run dev
 Then open this URL in a browser:
 
 ```text
-http://127.0.0.1:5173
+http://127.0.0.1:1420
 ```
 
 ## Test Commands
@@ -191,6 +193,7 @@ Latest verified result:
 - Treat `frontend/` as the UI source, not as the final standalone app.
 - Treat `src-tauri/` as the desktop shell and final app entry.
 - Python sidecar packaging is planned but not enabled in Tauri config yet; the current desktop build starts the Tauri shell and React UI only.
+
 
 
 

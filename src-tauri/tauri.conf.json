@@ -6,17 +6,19 @@
   "build": {
     "beforeDevCommand": "npm.cmd --prefix frontend run dev",
     "beforeBuildCommand": "npm.cmd --prefix frontend run build",
-    "devUrl": "http://127.0.0.1:5173",
+    "devUrl": "http://127.0.0.1:1420",
     "frontendDist": "frontend/dist"
   },
   "app": {
     "windows": [
       {
+        "label": "main",
         "title": "AuditX / VeriDoc",
         "width": 1440,
         "height": 960,
         "minWidth": 1180,
-        "minHeight": 760
+        "minHeight": 760,
+        "dataDirectory": "auditx-dev-webview-data"
       }
     ],
     "security": {

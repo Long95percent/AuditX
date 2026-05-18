@@ -50,8 +50,58 @@ if (-not (Test-Path "frontend/node_modules/@tauri-apps/cli")) {
     npm.cmd --prefix frontend install
 }
 
-Write-Host "[AuditX] Starting desktop app with local Tauri CLI..."
-& ".\frontend\node_modules\.bin\tauri.cmd" dev
+$frontendPortInUse = Get-NetTCPConnection -LocalAddress 127.0.0.1 -LocalPort 1420 -State Listen -ErrorAction SilentlyContinue
+if ($frontendPortInUse) {
+    $owningProcess = Get-Process -Id $frontendPortInUse.OwningProcess -ErrorAction SilentlyContinue
+    $processName = if ($owningProcess) { $owningProcess.ProcessName } else { "unknown" }
+    throw "Frontend dev port 127.0.0.1:1420 is already in use by process $($frontendPortInUse.OwningProcess) ($processName). Close existing AuditX/Tauri/Vite windows and rerun this script."
+}
+$backendStartedByScript = $false
+$backendProcess = $null
+
+try {
+    try {
+        Invoke-RestMethod -Uri "http://127.0.0.1:8765/health" -TimeoutSec 2 | Out-Null
+        Write-Host "[AuditX] Backend API already running on http://127.0.0.1:8765"
+    } catch {
+        Write-Host "[AuditX] Starting backend API on http://127.0.0.1:8765..."
+        $backendProcess = Start-Process `
+            -FilePath "python" `
+            -ArgumentList @("-m", "uvicorn", "auditx.main:app", "--app-dir", "backend", "--host", "127.0.0.1", "--port", "8765") `
+            -WorkingDirectory $repoRoot `
+            -PassThru
+        $backendStartedByScript = $true
+
+        $backendReady = $false
+        for ($attempt = 1; $attempt -le 20; $attempt++) {
+            Start-Sleep -Milliseconds 500
+            try {
+                Invoke-RestMethod -Uri "http://127.0.0.1:8765/health" -TimeoutSec 2 | Out-Null
+                $backendReady = $true
+                break
+            } catch {
+                if ($backendProcess.HasExited) {
+                    throw "Backend API exited before becoming ready."
+                }
+            }
+        }
+
+        if (-not $backendReady) {
+            throw "Backend API did not become ready on http://127.0.0.1:8765."
+        }
+        Write-Host "[AuditX] Backend API is ready."
+    }
+
+    Write-Host "[AuditX] Starting desktop app with local Tauri CLI..."
+    & ".\frontend\node_modules\.bin\tauri.cmd" dev
+} finally {
+    if ($backendStartedByScript -and $backendProcess -and -not $backendProcess.HasExited) {
+        Write-Host "[AuditX] Stopping backend API started by this script..."
+        Stop-Process -Id $backendProcess.Id -Force
+    }
+}
+
+
 
 
 
