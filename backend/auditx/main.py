@@ -2,6 +2,8 @@
 from fastapi.middleware.cors import CORSMiddleware
 
 from auditx.api.routes_audit_jobs import router as audit_jobs_router
+from auditx.api.routes_job_templates import router as job_templates_router
+from auditx.api.routes_settings import router as settings_router
 from auditx.config.settings import get_settings
 
 
@@ -15,6 +17,8 @@ def create_app() -> FastAPI:
         allow_headers=["Content-Type"],
     )
     app.include_router(audit_jobs_router)
+    app.include_router(settings_router)
+    app.include_router(job_templates_router)
 
     @app.get("/health")
     def health() -> dict[str, str]:

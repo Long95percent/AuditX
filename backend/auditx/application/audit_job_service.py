@@ -5,7 +5,9 @@ from pydantic import BaseModel, Field
 
 from auditx.application.audit_use_case import AuditUseCase
 from auditx.domain.audit import AuditFinding
+from auditx.domain.review import FindingCandidate, ReviewTrace
 from auditx.domain.results import AuditResult
+from auditx.domain.scoring import ScoreResult
 
 
 class AuditJobStatus(StrEnum):
@@ -22,6 +24,10 @@ class AuditJob(BaseModel):
     document_id: str | None = None
     findings: list[AuditFinding] = Field(default_factory=list)
     rejected_count: int = 0
+    candidates: list[FindingCandidate] = Field(default_factory=list)
+    rejected_candidates: list[FindingCandidate] = Field(default_factory=list)
+    score: ScoreResult | None = None
+    trace: ReviewTrace = Field(default_factory=ReviewTrace)
     error: str | None = None
 
 
@@ -56,3 +62,7 @@ class AuditJobService:
         job.document_id = result.document.document_id
         job.findings = result.findings
         job.rejected_count = result.rejected_count
+        job.candidates = result.candidates
+        job.rejected_candidates = result.rejected_candidates
+        job.score = result.score
+        job.trace = result.trace

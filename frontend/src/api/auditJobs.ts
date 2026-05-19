@@ -1,10 +1,23 @@
-﻿import type { AuditJob } from "../types/audit";
+﻿import type { AuditJob, JobTemplate } from "../types/audit";
 
 const API_BASE_URL = "http://127.0.0.1:8765";
 
 export interface HealthStatus {
   status: string;
   env: string;
+}
+
+export interface OpenAISettingsPayload {
+  api_key?: string | null;
+  model: string;
+  base_url: string;
+}
+
+export interface OpenAISettingsStatus {
+  configured: boolean;
+  api_key: null;
+  model: string;
+  base_url: string;
 }
 
 async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
@@ -44,3 +57,27 @@ export async function getHealthStatus(): Promise<HealthStatus> {
   return requestJson<HealthStatus>("/health");
 }
 
+export async function saveOpenAISettings(
+  payload: OpenAISettingsPayload,
+): Promise<OpenAISettingsStatus> {
+  return requestJson<OpenAISettingsStatus>("/api/settings/openai", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function testOpenAISettings(): Promise<OpenAISettingsStatus> {
+  return requestJson<OpenAISettingsStatus>("/api/settings/openai/test", {
+    method: "POST",
+  });
+}
+
+export async function createJobTemplateFromJD(
+  jobName: string,
+  jd: string,
+): Promise<JobTemplate> {
+  return requestJson<JobTemplate>("/api/job-templates/from-jd", {
+    method: "POST",
+    body: JSON.stringify({ job_name: jobName, jd }),
+  });
+}

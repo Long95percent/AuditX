@@ -1,304 +1,447 @@
-# 简历审查工具 12 天执行计划
+# AuditX 简历审查 MVP 12 天执行计划
 
-## 1. 目标
+> 本计划替代旧版“全量铺开”的 12 天计划。  
+> 核心策略：先完成最小真实 MVP，再进入小批量、列表页、Top N、分级压测。  
+> 判断标准：每天必须同时满足“功能产出 + 自动化测试/手工验收 + 可记录结果”，否则不进入下一阶段。
 
-用 12 天做出一个可演示、可测试、可扩展的简历审查效率工具 MVP。
+## 1. 计划目标
 
-核心交付：
+用 12 天完成一个可演示、可测试、可继续扩展的简历审查 MVP。
 
-- 岗位模板、优势词典、评分维度和候选人分层。
-- Agent 优先的审查链路：`AgentOrchestrator`、`FindingCandidate`、`ReviewTrace`。
-- 简历列表页和详情页基础展示：分层、优势、风险、证据、计算明细。
-- 本地模拟公司信息证据链接。
-- 测试简历生成、黄金测试集、回归测试和 5000 份压测。
+MVP 必须真实闭环：
 
-## 2. 执行原则
+```text
+本地简历 / fake parser
+  -> 结构化简历最小字段
+  -> 岗位模板
+  -> AgentOrchestrator
+  -> LLM mock + 规则工具
+  -> FindingCandidate
+  -> evidence 校验
+  -> 正式风险 / rejected candidates
+  -> scoring signals
+  -> ScoreResult + CandidateLayer
+  -> ReviewTrace
+  -> API 返回
+  -> 前端展示
+```
 
-- 先跑通 Agent 主链路，再逐步补规则。
-- 每 2-3 天留出一次集成和测试时间，不把测试压到最后一天。
-- 12 天计划内不做真实网页搜索，证据链接先使用本地文件。
-- 当前压测目标是单日 5000 份简历，不做 10 万实时压测。
-- 任何规则新增都要验证不会绕开 `AgentOrchestrator`。
+当前 12 天不追求完整企业系统，不追求 10 万历史库，不追求真实网页搜索。
 
-## 3. 12 天安排
+## 2. 设计文档链接
 
-每日完成定义：当天任务必须同时满足“功能产出 + 对应测试 + 可记录结果”三项，才算完成。若测试未通过，当天优先修复阻断问题，不把失败链路继续堆到后续天数。
+执行本计划前，必须先阅读以下设计文档：
 
-### Day 1：统一数据契约和岗位模板
+1. `docs/plans/agent_first_routing_design.md`
+   - `AgentOrchestrator` 是唯一审查主入口。
+   - 规则是工具，不是总路由。
+   - `FindingCandidate`、正式风险、`ReviewTrace` 的边界。
+   - 工具失败、Agent 失败和证据失败的降级方式。
 
-目标：先把产品和工程的核心结构定下来。
+2. `docs/plans/resume_review_scoring_and_presentation_design.md`
+   - 简历库输入、已筛查简历复用、当前批次重算。
+   - 评分维度、候选人分层、Top N 选择规则。
+   - HR 列表页、详情页、风险和证据展示。
+   - 测试数据、黄金测试集和 5000 份压测目标。
+
+3. `docs/plans/resume_review_product_flow.drawio`
+   - 产品流程图。
+   - 后续实现列表页、详情页、批量任务时参考。
+
+4. `docs/suggestions/2026-05-19-architecture-review-baseline.md`
+   - 架构审查红线。
+   - 后续代码审查标准。
+
+5. `docs/suggestions/2026-05-19-mvp-first-plan-and-12-day-review.md`
+   - 为什么先做最小真实 MVP。
+   - 为什么旧版 12 天计划不能继续硬推。
+
+## 3. 执行原则
+
+- 先完成真实 MVP，再扩展批量能力。
+- 不允许评分输入硬编码在 `AuditUseCase`。
+- 不允许 API route、规则或前端绕过 `AgentOrchestrator`。
+- 不允许无证据候选进入正式风险。
+- 不允许只写 worklog / acceptance 文档而没有测试或可运行验收。
+- 每天结束必须跑当天相关测试；阶段结束必须跑后端全量测试和前端 build。
+- 12 天内证据链接先用简历原文和本地模拟文件，不做真实网页搜索。
+- 压测采用分级策略：100 -> 500 -> 1000 -> 5000，不直接跳到 5000。
+
+## 4. 当前代码已具备的基础
+
+当前已有基础能力：
+
+- `backend/auditx/agent_core/orchestrator.py`：已有 `AgentOrchestrator` 雏形。
+- `backend/auditx/domain/review.py`：已有 `FindingCandidate`、`ReviewTrace` 雏形。
+- `backend/auditx/agent_core/llm_candidate_tool.py`：已有 LLM mock candidate 工具。
+- `backend/auditx/agent_core/rule_tools.py`：已有部分基础规则工具。
+- `backend/auditx/domain/scoring.py`：已有评分和 Top N 雏形。
+- `frontend/src/app/App.tsx`：已有单份 fake audit 展示页面。
+
+但当前仍有阻断缺口：
+
+- Day 1 数据契约不完整。
+- `AgentOrchestrator.review()` 只接收 `document`，缺少岗位模板和上下文。
+- `AuditUseCase` 中评分输入仍有演示硬编码。
+- 规则工具和 scoring signal 没有完整打通。
+- 简历库状态、批量任务、黄金测试集和压测尚未完成。
+
+## 5. 12 天安排
+
+### Day 1：补齐 MVP 数据契约
+
+目标：把后续所有链路依赖的数据结构先定稳。
 
 任务：
 
-- 定义岗位模板字段：硬性要求、优势词典、权重、风险策略、模板版本。
-- 定义简历库状态：新入库、已筛查、已入岗位候选库。
-- 定义状态流转：新上传 / 导入 -> 新入库 -> 完成审查后已筛查 -> HR 选择后已入岗位候选库。
-- 定义简历库输入筛选：按时间排序、只看新简历。
-- 定义评分维度：基础完整性、岗位硬性要求、能力匹配、经历相关性、优势信号、风险与不确定性。
-- 定义候选人分层：最优、次优但有潜力、不建议。
-- 定义 Top N 自动挑选机制：系统默认 `N = 20`，HR 可手动输入 N。
-- 定义 Top N 边界：输入数量小于 N 时全选；N 非法时提示重新输入。
-- 明确结果对象需要包含分数、分层、优势、风险、证据、计算明细。
+- 定义 `ResumeStatus`：`new`、`reviewed`、`shortlisted`。
+- 定义 `ResumeRecord`：简历 ID、文件名、入库时间、状态、解析结果引用。
+- 定义 `ReviewContext`：岗位模板、运行配置、历史上下文、是否复用解析结果。
+- 扩展 `JobTemplate`：硬性要求、优势词典、权重、风险策略、模板版本。
+- 补齐 3 个岗位模板样例：前端、财务、产品经理。
+- 明确结果对象：分数、分层、优势、风险、证据、计算明细、trace、rejected candidates。
+
+建议修改文件：
+
+- `backend/auditx/domain/scoring.py`
+- `backend/auditx/domain/review.py`
+- `backend/auditx/domain/results.py`
+- 可新增 `backend/auditx/domain/resume_library.py`
 
 测试：
 
-- 手工准备 3 个岗位模板样例：前端、财务、产品经理。
-- 用 3 份伪简历人工检查分层逻辑是否符合直觉。
-- 用 10 份伪简历检查默认 Top N 和手动输入 N 的挑选结果是否符合直觉。
+- `JobTemplate` 必须包含硬性要求、风险策略和模板版本。
+- 三个岗位模板 ID 不同，权重和优势词典不同。
+- `ResumeStatus` 状态枚举完整。
+- `ReviewContext` 能携带岗位模板和复用开关。
 
 产出：
 
-- 岗位模板样例。
-- 简历状态和输入筛选契约。
-- 评分和分层契约。
-- Top N 挑选契约。
+- MVP 数据契约。
+- 三个岗位模板样例。
+- 数据契约单元测试。
 
-### Day 2：建立 Agent 主路由骨架
+### Day 2：扩展 AgentOrchestrator 输入和上下文
 
-目标：避免后续再被规则路由绕开 Agent。
+目标：让主路由从 `document -> draft` 升级为 `document + job_template + context -> draft`。
 
 任务：
 
-- 建立 `AgentOrchestrator` 作为唯一审查入口。
-- 定义 `FindingCandidate`。
-- 定义 `ReviewTrace`。
-- 将现有 fake / rule 能力适配为可被 Orchestrator 调用的工具。
-- 确保 API route 不直接分发规则或 Agent。
+- 修改 `AgentOrchestrator.review()`，接收 `document`、`job_template`、`context`。
+- 统一工具输入：`document`、`job_template`、`context`。
+- 修改 LLM mock 工具和规则工具，使其适配统一输入。
+- 修改 `AuditUseCase`，只负责 parser + orchestrator + result assembly。
+- 保证 API route 不直接调用规则、Agent 或具体工具。
+
+建议修改文件：
+
+- `backend/auditx/agent_core/orchestrator.py`
+- `backend/auditx/agent_core/llm_candidate_tool.py`
+- `backend/auditx/agent_core/rule_tools.py`
+- `backend/auditx/application/audit_use_case.py`
+- `backend/auditx/api/dependencies.py`
 
 测试：
 
-- 路由单测：调用审查流程时必须产生 Agent step trace。
-- 失败隔离测试：某个工具失败时主流程不中断。
+- 调用审查流程必然产生 `ReviewTrace`。
+- trace 中能看到 LLM mock 和规则工具 step。
+- 工具失败不影响整份审查。
+- `AdvantageDictionaryTool` 能通过 orchestrator 拿到 `job_template`。
 
 产出：
 
-- Agent 优先链路骨架。
-- 最小 trace 输出。
+- 带上下文的 Agent 主链路。
+- 不绕过 orchestrator 的路由测试。
 
-### Day 3：LLM Mock 与候选发现链路
+### Day 3：打通候选发现和 evidence gate
 
-目标：先跑通“LLM / Agent 发现候选风险”的可用链路。
+目标：让 LLM mock 和规则工具都统一产出候选，再通过证据门禁进入正式风险。
 
 任务：
 
-- 实现 LLM mock provider，返回结构化候选优势、风险和摘要。
-- 将 LLM mock 输出转换为 `FindingCandidate`。
-- 接入 evidence 收集流程。
-- 未通过 evidence 校验的候选进入 rejected / pending，不进入正式风险。
+- 统一 LLM mock、规则工具输出为 `FindingCandidate`。
+- 补 rejected candidate 的拒绝原因字段或 trace metadata。
+- 未通过 evidence 校验的候选进入 rejected candidates。
+- 正式 findings 必须全部经过 `EvidenceValidator`。
+- 本地简历原文 evidence 支持 quote、block、bbox。
+
+建议修改文件：
+
+- `backend/auditx/domain/review.py`
+- `backend/auditx/agent_core/orchestrator.py`
+- `backend/auditx/agent_core/evidence_validator.py`
+- `backend/auditx/agent_core/llm_candidate_normalizer.py`
 
 测试：
 
 - LLM mock 返回有证据候选时，可转正式风险。
 - LLM mock 返回无证据候选时，被拒绝但 trace 可见。
-- trace 中可看到 Agent 输入、输出、采纳和拒绝原因。
+- 规则候选无证据时不能进入正式 findings。
+- rejected candidates 保留来源和拒绝原因。
 
 产出：
 
-- Agent 发现候选风险的端到端链路。
+- 候选发现端到端链路。
+- evidence gate 测试。
 
-### Day 4：岗位匹配与评分引擎第一版
+### Day 4：去掉评分硬编码，接入 scoring signals
 
-目标：让结果不只是列举风险，而是形成可解释评分。
+目标：评分结果来自岗位模板、规则输出、Agent output 和正式风险，而不是写死在 `AuditUseCase`。
 
 任务：
 
-- 实现维度分计算。
-- 实现岗位模板权重。
-- 实现硬性要求低分但不自动淘汰。
-- 实现优势信号加分和风险扣分。
-- 实现默认 Top N 和 HR 自定义 N 的挑选逻辑。
-- 实现 Top N 排序并列规则：风险更少优先，优势更多优先，入库时间更新优先。
-- 输出计算明细。
+- 定义 `ScoringSignal` 或等价结构。
+- 让优势词典、关键词命中、硬性要求相关规则输出 scoring signals。
+- 从 `FindingCandidate`、正式 findings 和 scoring signals 生成 `CandidateScoreInput`。
+- 删除 `AuditUseCase` 中固定的 `hard_requirement_match=0.75`、`ability_match=0.8`、固定 advantage signals。
+- 计算明细要能追溯到 signal、规则或 Agent step。
+
+建议修改文件：
+
+- `backend/auditx/domain/scoring.py`
+- `backend/auditx/agent_core/rule_tools.py`
+- `backend/auditx/agent_core/orchestrator.py`
+- `backend/auditx/application/audit_use_case.py`
 
 测试：
 
-- 低学历但技能强的样本应进入“次优但有潜力”，不能直接“不建议”。
-- 同一简历在不同岗位模板下得分和优势标签不同。
-- HR 输入不同 N 时，入选数量和分层结果符合预期。
-- 输入数量小于 N 时全部入选，非法 N 不启动挑选。
-- 重复运行同一模板版本，分数一致。
+- 同一简历在不同岗位模板下 score 或 advantage tags 不同。
+- 风险数量影响扣分。
+- 硬性要求低分但不自动淘汰。
+- 计算明细包含 signal 来源。
+- 代码中不再存在演示硬编码评分输入。
 
 产出：
 
-- 第一版评分结果和分层结果。
+- 真实评分链路第一版。
+- 评分与 signal 测试。
 
-### Day 5：优势词典与基础规则工具
+### Day 5：单份简历 MVP 前端闭环
 
-目标：补充稳定规则，但不让规则接管主路由。
+目标：完成可演示的单份简历审查详情页。
 
 任务：
 
-- 实现岗位优势词典命中。
-- 实现联系方式缺失、教育经历缺失、年限计算、关键词命中等基础规则工具。
-- 规则输出统一为 `FindingCandidate` 或 scoring signal。
-- 规则调用记录写入 `ReviewTrace`。
+- 前端展示 score、layer、dimension scores、advantage tags。
+- 展示正式 findings 和 rejected candidates。
+- 展示 evidence quote、page、block、bbox。
+- 展示 ReviewTrace：Agent、规则、工具、evidence gate 状态。
+- API response schema 与前端类型保持一致。
+- 编写 MVP 手工验收说明。
+
+建议修改文件：
+
+- `backend/auditx/api/schemas.py`
+- `frontend/src/types/audit.ts`
+- `frontend/src/app/App.tsx`
+- `frontend/src/styles/global.css`
+- 可新增 `docs/acceptance/day5-single-resume-mvp.md`
 
 测试：
 
-- 每条规则都有单测。
-- 规则失败不影响 Agent 主链路。
-- 每新增规则都有“不会绕开 Agent”的路由测试。
+- API 集成测试断言返回 score、layer、findings、rejected candidates、trace。
+- 前端 `npm.cmd --prefix frontend run build` 通过。
+- 手工验收单份简历详情页可解释。
 
 产出：
 
-- 可解释优势标签。
-- 第一批稳定规则工具。
+- 最小真实 MVP。
+- 单份简历审查演示闭环。
 
-### Day 6：集成测试日 1
+### Day 6：MVP 集成测试和缺口修复
 
-目标：集中修链路问题，避免后面越堆越乱。
+目标：不新增大功能，专门验证 Day 1-5 真实闭环。
 
 任务：
 
-- 跑通 10-20 份样例简历。
-- 混合测试新入库和已筛查简历，确认已筛查简历可复用解析结果。
-- 检查每份是否有分层、优势、风险、证据和 trace。
-- 修复候选发现、证据校验、评分明细之间的数据不一致。
-- 记录当前误判和漏判样例。
+- 跑后端全量测试。
+- 跑前端 build。
+- 检查所有正式风险都有 evidence。
+- 检查 trace 是否覆盖 LLM mock、规则工具、evidence gate、评分。
+- 修复 Day 1-5 遗留缺口。
+- 整理 MVP 已知限制。
 
 测试：
 
-- 端到端集成测试。
-- trace 完整性测试。
-- evidence 校验测试。
+- `python -m pytest backend\tests -q -p no:cacheprovider`
+- `npm.cmd --prefix frontend run build`
+- 手工跑一次桌面/浏览器 MVP 流程。
 
 产出：
 
-- 第一次可演示的后端审查结果。
-- 问题清单和修复记录。
+- MVP 集成测试记录。
+- 已知限制清单。
+- 是否进入批量阶段的 go / no-go 结论。
 
-### Day 7：HR 列表页与详情页基础展示
+### Day 7：测试数据生成器和小型黄金集
 
-目标：让 HR 能按分层和优势快速看结果。
-
-任务：
-
-- 列表页展示：姓名、岗位、分层、总分、优势标签、风险数量、状态。
-- 列表页展示简历状态：新入库、已筛查、已入岗位候选库。
-- 列表页提供简历库输入选择，支持按时间排序和只看新简历两个预定义筛选。
-- 列表页提供 Top N 输入框，默认值可配置，HR 可重新生成入选候选池。
-- 支持按岗位、分层、风险、优势标签筛选。
-- 详情页展示：摘要、维度分、优势、风险、证据。
-- 计算明细默认折叠，支持展开。
-
-测试：
-
-- 使用固定样例检查列表排序和筛选。
-- 检查按时间排序和只看新简历两个预定义筛选。
-- 检查已筛查简历再次输入时，解析和结构化信息可复用，但当前 rank 会重算。
-- 检查默认 Top N 和手动输入 N 后的候选池展示。
-- 检查详情页风险点与计算明细一致。
-- 检查没有证据的候选不会显示为正式风险。
-
-产出：
-
-- HR 可用的第一版审查视图。
-
-### Day 8：本地公司信息与风险证据链接
-
-目标：先用本地文件模拟 Agent 查找证据，不依赖真实网页。
+目标：先有稳定测试数据，再做批量和 Top N。
 
 任务：
 
-- 准备本地公司模拟库。
-- 实现公司名称模糊、白名单、模拟查询工具。
-- 风险证据支持本地链接，例如 `local://evidence/company_mock_db.json#...`。
-- 详情页展示 Agent 查找过程和证据来源。
-
-测试：
-
-- 模糊公司名能生成风险候选。
-- 白名单公司不应误报高风险。
-- 本地证据链接可被前端展开或定位。
-- 公司库查询失败时降级为不确定提示。
-
-产出：
-
-- 本地公司信息模拟能力。
-- 风险证据链展示。
-
-### Day 9：测试数据生成器与黄金测试集
-
-目标：保证后续改 Agent 或规则时有回归基础。
-
-任务：
-
-- 实现批量简历数据生成器。
-- 支持注入：低学历、年限不足、时间重叠、公司模糊、优势词命中、联系方式缺失。
-- 建立黄金测试集：每个岗位至少 20 份。
+- 实现测试简历数据生成器。
+- 生成覆盖三层候选人的样本：最优、次优但有潜力、不建议。
+- 建立小型黄金集：每个岗位至少 5 份，后续再扩到 20 份。
 - 标注预期分层、主要优势、主要风险和关键证据。
+- 黄金集结果可导出或快照比较。
+
+建议新增文件：
+
+- `backend/auditx/testing/resume_factory.py`
+- `backend/tests/golden/` 或 `backend/tests/fixtures/golden/`
+- `backend/tests/integration/test_golden_resume_set.py`
 
 测试：
 
 - 生成数据字段完整。
-- 黄金测试集能稳定跑通。
-- 修改规则后能发现分层或风险解释变化。
+- 黄金集能稳定跑通。
+- 修改评分权重后，测试能发现分层变化。
 
 产出：
 
 - 测试数据生成器。
-- 第一版黄金测试集。
+- 小型黄金测试集。
 
-### Day 10：批量任务与 5000 份压测准备
+### Day 8：简历库状态和输入筛选
 
-目标：让系统按批处理方式运行，而不是单份同步卡死。
+目标：实现最小简历库模型，为列表页和批量任务做准备。
 
 任务：
 
-- 批量导入任务模型。
-- 简历库输入选择模型。
-- 简历状态更新：新入库、已筛查、已入岗位候选库。
-- 任务状态：待处理、解析中、审查中、完成、失败。
-- 失败任务记录和重试入口。
-- 列表分页、筛选、排序基础索引或缓存。
-- 准备 5000 份测试数据。
+- 实现内存版 `ResumeRepository` 或等价存储接口。
+- 支持 `new`、`reviewed`、`shortlisted` 状态。
+- 支持按入库时间排序。
+- 支持只看新简历。
+- 审查完成后状态从 `new` 变为 `reviewed`。
+- 已筛查简历再次输入时允许复用解析结果，但当前岗位 score 需要重算。
+
+建议新增/修改文件：
+
+- `backend/auditx/domain/resume_library.py`
+- `backend/auditx/application/resume_library_service.py`
+- `backend/tests/unit/test_resume_library.py`
+- `backend/tests/integration/test_reviewed_resume_reuse.py`
 
 测试：
 
-- 单批 500-1000 份导入可进入队列。
-- HR 可从简历库按时间排序或只看新简历选择输入。
-- 失败任务可追踪并重试。
-- 列表分页和筛选在批量数据下可用。
+- 新入库简历可按时间排序。
+- 只看新简历筛选正确。
+- 审查完成后状态更新。
+- 已筛查简历复用解析结果但重算 score。
+
+产出：
+
+- 最小简历库能力。
+- 状态流转测试。
+
+### Day 9：HR 列表页和详情页第一版
+
+目标：让 HR 能从简历库选择输入，并查看结果列表和详情。
+
+任务：
+
+- 后端提供简历列表 API。
+- 后端提供审查结果详情 API。
+- 前端列表展示：姓名/文件名、状态、岗位、分层、总分、优势标签、风险数量。
+- 支持按时间排序和只看新简历两个预定义筛选。
+- 详情页复用 Day 5 单份展示。
+
+建议修改文件：
+
+- `backend/auditx/api/routes_audit_jobs.py`
+- 可新增 `backend/auditx/api/routes_resumes.py`
+- `frontend/src/api/auditJobs.ts`
+- `frontend/src/app/App.tsx`
+- `frontend/src/types/audit.ts`
+
+测试：
+
+- 列表 API 可返回状态和排序结果。
+- 前端 build 通过。
+- 手工验收列表筛选和详情一致性。
+
+产出：
+
+- HR 列表页第一版。
+- 简历详情页第一版。
+
+### Day 10：批量任务和 Top N 当前批次排序
+
+目标：实现小批量处理，不直接追求 5000。
+
+任务：
+
+- 定义 `BatchReviewJob` 和单份任务状态：待处理、解析中、审查中、完成、失败。
+- 支持单批 100 份测试数据处理。
+- 单份失败不影响整批。
+- 失败任务记录失败原因。
+- 实现当前批次 Top N：默认 N=20，HR 可传 N。
+- Top N 并列规则：风险更少优先、优势更多优先、入库时间更新优先。
+
+建议新增/修改文件：
+
+- `backend/auditx/domain/batch.py`
+- `backend/auditx/application/batch_review_service.py`
+- `backend/tests/integration/test_batch_review.py`
+- `backend/tests/unit/test_top_n_current_batch.py`
+
+测试：
+
+- 单批 100 份可完成。
+- 失败任务可追踪。
+- 自定义 N 生效。
+- 输入少于 N 时全选。
+- 非法 N 返回错误。
 
 产出：
 
 - 批量任务第一版。
-- 5000 份压测数据。
+- 当前批次 Top N。
 
-### Day 11：压测与稳定性修复
+### Day 11：本地证据库和分级压测
 
-目标：专门留一天做压测和修复，不新增大功能。
+目标：补本地模拟公司证据，并跑 100/500/1000 分级压测。
 
 任务：
 
-- 跑 5000 份简历处理测试。
-- 记录耗时、失败率、内存占用、任务积压、列表响应情况。
-- 修复明显的链路崩溃、状态丢失、重复处理、trace 缺失问题。
-- 导出压测摘要。
+- 建立本地公司模拟库。
+- 风险证据支持 `local://evidence/company_mock_db.json#...`。
+- 模糊公司名生成风险候选。
+- 白名单公司不误报高风险。
+- 公司库查询失败降级为不确定提示。
+- 跑 100、500、1000 份分级压测。
+- 记录耗时、失败率、任务积压、列表响应情况。
+
+建议新增/修改文件：
+
+- `backend/auditx/agent_core/company_evidence_tool.py`
+- `backend/auditx/domains/hr_recruitment/company_mock_db.json`
+- `backend/tests/integration/test_company_evidence_tool.py`
+- `docs/acceptance/day11-scaled-pressure-test.md`
 
 测试：
 
-- 单日 5000 份简历累计处理。
-- 压测输入中同时包含新入库和已筛查简历。
-- 同一模板版本下重复运行结果一致。
-- 失败任务 100% 有失败原因。
-- 列表页常用筛选可接受。
+- 本地证据链接可生成。
+- 模糊公司名风险可降级处理。
+- 100/500/1000 压测有结果记录。
 
 产出：
 
-- 压测报告。
-- 稳定性修复清单。
+- 本地证据链。
+- 分级压测报告。
 
-### Day 12：演示验收与回归测试
+### Day 12：5000 份压测和演示验收
 
-目标：最后一天只做收尾、验收和演示准备。
+目标：完成最终演示版本和回归验收。
 
 任务：
 
-- 跑完整回归测试。
+- 跑完整后端测试。
+- 跑前端 build。
 - 跑黄金测试集。
 - 准备演示数据：最优、次优但有潜力、不建议各若干份。
-- 检查 HR 视图是否能展示优势、风险、证据、计算明细和 Agent trace。
+- 如 Day 11 的 1000 份压测稳定，再跑 5000 份累计处理测试。
+- 如果 1000 份不稳定，不强行宣称 5000 完成，记录阻断原因。
 - 整理已知限制和下一阶段计划。
 
 测试：
@@ -308,50 +451,65 @@
 - 端到端审查测试。
 - 黄金测试集回归。
 - 关键 UI 手工验收。
+- 5000 份压测或阻断报告。
 
 产出：
 
 - 可演示版本。
 - 回归测试结果。
+- 压测报告。
 - 已知问题和下一阶段清单。
 
-## 4. 测试时间安排
+## 6. 阶段验收门槛
 
-测试不是最后一天才做，按以下节奏穿插：
+### MVP 门槛，Day 6 必须满足
 
-| 时间 | 测试重点 |
-|---|---|
-| Day 1 | 岗位模板和分层逻辑人工校验 |
-| Day 2 | Agent 路由和失败隔离单测 |
-| Day 3 | LLM mock 候选发现和 evidence 校验 |
-| Day 4 | 评分、分层、一致性测试 |
-| Day 5 | 规则工具单测和不绕开 Agent 测试 |
-| Day 6 | 第一次端到端集成测试 |
-| Day 7 | HR 视图和数据一致性测试 |
-| Day 8 | 本地证据链接和公司模拟库测试 |
-| Day 9 | 测试数据生成器和黄金测试集 |
-| Day 10 | 批量任务和分页筛选测试 |
-| Day 11 | 5000 份压测和稳定性修复 |
-| Day 12 | 完整回归、演示验收 |
+- 单份简历能输出分层、优势、风险、证据和计算明细。
+- `ReviewTrace` 能说明调用了哪些 Agent、规则和工具。
+- 无证据候选不会进入正式风险。
+- 同一份简历在不同岗位模板下有不同匹配结果。
+- 评分输入不再硬编码在 `AuditUseCase`。
+- 前端能展示 score、layer、findings、rejected candidates、evidence、trace。
 
-## 5. 不做事项
+### 批量门槛，Day 10 必须满足
+
+- 简历状态可区分 `new`、`reviewed`、`shortlisted`。
+- HR 可按时间排序或只看新简历。
+- 批量任务支持单份失败隔离。
+- 当前批次 Top N 可重算。
+- 自定义 N、非法 N、小于 N 都有测试。
+
+### 最终门槛，Day 12 必须满足
+
+- 黄金测试集能稳定回归。
+- 本地证据链接可展示。
+- 压测有结果、失败可追踪。
+- 已知限制明确记录。
+- 不把未完成的 5000 压测写成完成。
+
+## 7. 不做事项
 
 - 不做真实网页搜索。
 - 不做生产级公司背景调查。
 - 不做 10 万实时压测。
 - 不做复杂权限和团队协作。
+- 不做真实企业级持久化方案；当前可以先用内存或轻量本地文件，但接口要可替换。
 - 不让规则路由绕过 `AgentOrchestrator`。
 
-## 6. 验收标准
+## 8. 每日记录要求
 
-- 单份简历能输出分层、优势、风险、证据和计算明细。
-- HR 可从简历库选择输入，预定义支持按时间排序和只看新简历。
-- 简历状态可区分新入库、已筛查、已入岗位候选库。
-- 已筛查简历可复用解析结果和结构化信息，但当前批次 rank 必须重算。
-- HR 可输入 N，系统自动挑选当前岗位 / 当前批次最适合的 N 份简历。
-- 同一份简历在不同岗位模板下有不同匹配结果。
-- 低学历或单项不足不会被系统直接一票否决。
-- 风险点能定位到简历原文或本地模拟证据链接。
-- trace 能说明调用了哪些 Agent、规则和工具。
-- 黄金测试集能稳定回归。
-- 单日 5000 份简历压测有结果、失败可追踪、任务可恢复。
+每天完成后必须更新 worklog 或 acceptance 文档，记录：
+
+- 当天完成的文件。
+- 当天新增/修改的测试。
+- 实际运行的命令和结果。
+- 未完成项和阻断原因。
+- 是否允许进入下一天。
+
+建议 acceptance 文件命名：
+
+```text
+docs/acceptance/dayN-<topic>.md
+```
+
+如果当天测试未通过，不得把失败链路继续堆到后续天数。

@@ -19,6 +19,8 @@ def test_audit_use_case_returns_only_evidence_backed_findings() -> None:
     assert finding.rule_id == "hr.timeline.fake_risk"
     assert finding.evidences[0].block_id == "p1_b1"
     assert finding.evidences[0].bbox.x1 > finding.evidences[0].bbox.x0
+    assert result.trace.steps[0].step_type == "agent"
+    assert result.trace.steps[0].name == "fake_extractor.extract"
 
 
 def test_audit_use_case_rejects_findings_without_matching_document_evidence() -> None:
@@ -32,3 +34,26 @@ def test_audit_use_case_rejects_findings_without_matching_document_evidence() ->
 
     assert len(result.findings) == 1
     assert all(finding.finding_id != "fake_invalid_finding" for finding in result.findings)
+    assert result.rejected_count == 1
+    assert any(step.status == "rejected" for step in result.trace.steps)
+
+
+def test_audit_use_case_routes_extraction_through_registered_tool() -> None:
+    from auditx.agent_core.extractor_tool import ExtractorTool
+    from auditx.tool_registry.registry import ToolRegistry
+
+    registry = ToolRegistry()
+    registry.register(ExtractorTool(extractor=FakeExtractor()))
+    use_case = AuditUseCase(
+        parser=FakeDocumentParser(),
+        extractor=FakeExtractor(include_invalid_finding=True),
+        normalizer=FindingNormalizer(),
+        tool_registry=registry,
+    )
+
+    result = use_case.run(file_path="demo_resume.pdf")
+
+    assert len(result.findings) == 1
+    assert result.rejected_count == 0
+    assert result.trace.steps[0].step_type == "tool"
+    assert result.trace.steps[0].metadata["tool_name"] == "agent.extractor.fake"
