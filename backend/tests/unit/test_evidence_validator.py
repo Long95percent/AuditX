@@ -45,3 +45,30 @@ def test_evidence_validator_accepts_quote_bound_to_existing_block() -> None:
     )
 
     assert EvidenceValidator().validate(finding, document) is True
+
+
+def test_evidence_validator_rejects_finding_without_evidence() -> None:
+    document = ParsedDocument(
+        document_id="doc_1",
+        filename="resume.pdf",
+        pages=[
+            DocumentPage(
+                page_number=1,
+                width=800,
+                height=1000,
+                blocks=[],
+            )
+        ],
+    )
+    finding = AuditFinding.model_construct(
+        finding_id="finding_without_evidence",
+        rule_id="llm.unverified",
+        title="无证据风险",
+        description="没有原文证据的风险不能进入正式 findings。",
+        risk_level=RiskLevel.medium,
+        confidence=0.5,
+        evidences=[],
+        source_agent="llm_mock",
+    )
+
+    assert EvidenceValidator().validate(finding, document) is False

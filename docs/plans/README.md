@@ -19,34 +19,38 @@ AuditX 面向 HR / 招聘团队，核心目标是提升简历初筛效率：
 
 建议按以下顺序审查：
 
-1. `12_day_execution_plan.md`
+1. `product_blueprint_resume_screening.md`
+   - 产品定位、用户场景、买点和真实业务交付标准。
+   - Agent 主导审查、风险证据、视觉定位、存储、联网搜索和压测的连贯产品方案。
+
+2. `12_day_execution_plan.md`
    - 当前唯一执行排期。
    - 先最小真实 MVP，再小批量、列表页、Top N、分级压测。
    - 每天包含任务、建议文件、测试和产出。
 
-2. `agent_first_routing_design.md`
+3. `agent_first_routing_design.md`
    - Agent 优先的审查路由。
    - 规则工具化。
    - LLM 放权边界。
    - `FindingCandidate`、`ReviewTrace`、降级策略。
    - 防止规则路由绕开 Agent 能力。
 
-3. `resume_review_scoring_and_presentation_design.md`
+4. `resume_review_scoring_and_presentation_design.md`
    - 指标归类。
    - 评分方式。
    - 候选人分层。
    - HR 列表页和详情页呈现。
    - 测试数据和 5000 份压测目标。
 
-4. `resume_review_product_flow.drawio`
+5. `resume_review_product_flow.drawio`
    - 产品流程图。
    - 用于理解 HR 输入、审查结果、列表页和详情页之间的关系。
 
-5. `docs/suggestions/2026-05-19-architecture-review-baseline.md`
+6. `docs/suggestions/2026-05-19-architecture-review-baseline.md`
    - 架构审查基线。
    - 后续代码偏离设计时的判断标准。
 
-6. `docs/suggestions/2026-05-19-mvp-first-plan-and-12-day-review.md`
+7. `docs/suggestions/2026-05-19-mvp-first-plan-and-12-day-review.md`
    - 为什么先做最小真实 MVP。
    - 为什么旧版全量铺开的 12 天计划需要调整。
 
@@ -59,6 +63,12 @@ AuditX 面向 HR / 招聘团队，核心目标是提升简历初筛效率：
 - 单个 Agent、规则或工具失败，不应导致整份简历审查失败。
 - 岗位模板控制权重、优势词典、硬性要求和风险策略。
 - HR 看到的是分层、优势、风险、证据、计算明细和 trace，不是黑箱机器裁决。
+
+## 3.1 AI 执行控制
+
+后续让 AI 搭建功能时，必须要求它先声明当前执行 Day 几，并引用 `12_day_execution_plan.md` 的具体任务。不要让 AI 根据零散上下文直接扩展功能。
+
+推荐固定入口：`product_blueprint_resume_screening.md` -> `12_day_execution_plan.md` -> 当前 Day 任务 -> worklog。
 
 ## 4. 12 天计划优先级
 

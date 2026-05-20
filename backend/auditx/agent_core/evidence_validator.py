@@ -4,6 +4,8 @@ from auditx.domain.documents import ParsedDocument
 
 class EvidenceValidator:
     def validate(self, finding: AuditFinding, document: ParsedDocument) -> bool:
+        if not finding.evidences:
+            return False
         blocks_by_id = {
             block.block_id: block
             for page in document.pages

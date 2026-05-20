@@ -1,1 +1,1 @@
-{"root":["./src/main.tsx","./src/vite-env.d.ts","./src/api/auditjobs.ts","./src/app/app.tsx","./src/types/audit.ts"],"version":"6.0.3"}
+{"root":["./src/config.ts","./src/main.tsx","./src/vite-env.d.ts","./src/api/auditjobs.ts","./src/app/app.tsx","./src/types/audit.ts"],"version":"6.0.3"}

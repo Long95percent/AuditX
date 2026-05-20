@@ -38,6 +38,7 @@ class FindingCandidate(BaseModel):
     evidences: list[Evidence] = Field(default_factory=list)
     suggestion: str = ""
     source_agent: str = Field(min_length=1)
+    rejection_reason: str | None = None
 
 
 class ReviewReportDraft(BaseModel):

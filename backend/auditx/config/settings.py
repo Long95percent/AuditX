@@ -1,4 +1,8 @@
-﻿from pydantic_settings import BaseSettings, SettingsConfigDict
+﻿from functools import lru_cache
+from pathlib import Path
+
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
@@ -9,11 +13,15 @@ class Settings(BaseSettings):
     api_host: str = "127.0.0.1"
     api_port: int = 8765
     storage_dir: str = ".data"
+    allowed_document_roots: list[str] = Field(
+        default_factory=lambda: [str(Path.cwd()), str(Path.home())]
+    )
     llm_provider: str = "none"
     llm_model: str = ""
     llm_api_key: str = ""
     ocr_provider: str = "none"
 
 
+@lru_cache(maxsize=1)
 def get_settings() -> Settings:
     return Settings()

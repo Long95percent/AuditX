@@ -1,9 +1,10 @@
-﻿import { open } from "@tauri-apps/plugin-dialog";
+import { open } from "@tauri-apps/plugin-dialog";
 import { useEffect, useState } from "react";
 
 import {
   createAuditJob,
   createJobTemplateFromJD,
+  getAuditJob,
   getHealthStatus,
   saveOpenAISettings,
   testOpenAISettings,
@@ -16,6 +17,16 @@ function formatBBox(bbox: { x0: number; y0: number; x1: number; y1: number }) {
   return `x0=${bbox.x0}, y0=${bbox.y0}, x1=${bbox.x1}, y1=${bbox.y1}`;
 }
 
+async function waitForTerminalJob(jobId: string) {
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const nextJob = await getAuditJob(jobId);
+    if (nextJob.status === "completed" || nextJob.status === "failed") {
+      return nextJob;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 300));
+  }
+  return getAuditJob(jobId);
+}
 function displayFileName(filePath: string | null) {
   if (!filePath) {
     return "No document selected";
@@ -105,6 +116,7 @@ export function App() {
       setHealth(nextHealth);
       const nextJob = await createAuditJob(selectedFilePath);
       setJob(nextJob);
+      setJob(await waitForTerminalJob(nextJob.job_id));
     } catch (auditError) {
       setError(auditError instanceof Error ? auditError.message : "Unknown audit error");
     } finally {

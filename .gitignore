@@ -1,4 +1,4 @@
-﻿# Python
+# Python
 .venv/
 __pycache__/
 *.py[cod]
@@ -35,3 +35,7 @@ Thumbs.db
 # uv cache
 .uv-cache/
 pytest-cache-files-*/
+
+# Local app storage
+.data/
+backend/tests/.repo_tmp/

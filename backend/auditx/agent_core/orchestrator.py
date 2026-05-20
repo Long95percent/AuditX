@@ -72,19 +72,32 @@ class AgentOrchestrator:
                         name="candidate_evidence_gate",
                         status=ReviewStepStatus.accepted,
                         output_summary=f"Accepted candidate {candidate.candidate_id}",
-                        metadata={"candidate_id": candidate.candidate_id},
+                        metadata={
+                            "candidate_id": candidate.candidate_id,
+                            "source_agent": candidate.source_agent,
+                            "evidence_count": len(candidate.evidences),
+                        },
                     )
                 )
             else:
+                rejection_reason = self._candidate_rejection_reason(candidate, finding)
                 rejected_count += 1
-                rejected_candidates.append(candidate)
+                rejected_candidate = candidate.model_copy(
+                    update={"rejection_reason": rejection_reason}
+                )
+                rejected_candidates.append(rejected_candidate)
                 trace.steps.append(
                     self._step(
                         step_id=f"candidate_{candidate.candidate_id}",
                         name="candidate_evidence_gate",
                         status=ReviewStepStatus.rejected,
-                        output_summary=f"Rejected candidate {candidate.candidate_id}: missing evidence",
-                        metadata={"candidate_id": candidate.candidate_id},
+                        output_summary=f"Rejected candidate {candidate.candidate_id}: {rejection_reason}",
+                        metadata={
+                            "candidate_id": candidate.candidate_id,
+                            "source_agent": candidate.source_agent,
+                            "rejection_reason": rejection_reason,
+                            "evidence_count": len(candidate.evidences),
+                        },
                     )
                 )
 
@@ -275,6 +288,13 @@ class AgentOrchestrator:
             suggestion=candidate.suggestion,
             source_agent=candidate.source_agent,
         )
+
+    def _candidate_rejection_reason(
+        self, candidate: FindingCandidate, finding: AuditFinding | None
+    ) -> str:
+        if not candidate.evidences or finding is None:
+            return "missing verified evidence"
+        return "invalid evidence reference"
 
     def _extract_candidates_with_tool(
         self,

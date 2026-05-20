@@ -1,4 +1,5 @@
-﻿from enum import StrEnum
+from enum import StrEnum
+from typing import Protocol
 from uuid import uuid4
 
 from pydantic import BaseModel, Field
@@ -31,25 +32,60 @@ class AuditJob(BaseModel):
     error: str | None = None
 
 
-class AuditJobService:
-    def __init__(self, use_case: AuditUseCase) -> None:
-        self.use_case = use_case
+class AuditJobRepository(Protocol):
+    def save(self, job: AuditJob) -> None:
+        pass
+
+    def get(self, job_id: str) -> AuditJob | None:
+        pass
+
+
+class InMemoryAuditJobRepository:
+    def __init__(self) -> None:
         self._jobs: dict[str, AuditJob] = {}
 
-    def create_and_run(self, file_path: str) -> AuditJob:
-        job = AuditJob(job_id=str(uuid4()), file_path=file_path, status=AuditJobStatus.pending)
+    def save(self, job: AuditJob) -> None:
         self._jobs[job.job_id] = job
+
+    def get(self, job_id: str) -> AuditJob | None:
+        return self._jobs.get(job_id)
+
+
+class AuditJobService:
+    def __init__(
+        self,
+        use_case: AuditUseCase,
+        repository: AuditJobRepository | None = None,
+    ) -> None:
+        self.use_case = use_case
+        self.repository = repository or InMemoryAuditJobRepository()
+
+    def create(self, file_path: str) -> AuditJob:
+        job = AuditJob(job_id=str(uuid4()), file_path=file_path, status=AuditJobStatus.pending)
+        self.repository.save(job)
+        return job
+
+    def create_and_run(self, file_path: str) -> AuditJob:
+        job = self.create(file_path)
+        self.run(job.job_id)
+        return self.get(job.job_id) or job
+
+    def run(self, job_id: str) -> None:
+        job = self.repository.get(job_id)
+        if job is None:
+            return
         job.status = AuditJobStatus.running
+        self.repository.save(job)
         try:
-            result = self.use_case.run(file_path=file_path)
+            result = self.use_case.run(file_path=job.file_path)
             self._apply_result(job, result)
         except Exception as exc:
             job.status = AuditJobStatus.failed
             job.error = str(exc)
-        return job
+        self.repository.save(job)
 
     def get(self, job_id: str) -> AuditJob | None:
-        return self._jobs.get(job_id)
+        return self.repository.get(job_id)
 
     def findings(self, job_id: str) -> list[AuditFinding] | None:
         job = self.get(job_id)

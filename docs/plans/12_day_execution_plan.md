@@ -28,44 +28,69 @@ MVP 必须真实闭环：
 
 当前 12 天不追求完整企业系统，不追求 10 万历史库，不追求真实网页搜索。
 
+## 1.1 产品定位和交付红线
+
+AuditX 的产品定位不是“AI 读简历 demo”，而是 **Agent 主导的智能简历初筛工作台**。
+
+它要解决的真实业务问题是：HR 面对大量简历时，能快速知道谁最值得先看、为什么值得看、风险在哪里、证据在哪里、AI 做了哪些判断。
+
+因此，12 天计划内允许使用 MVP 方式逐步搭建和测试，但每天交付给用户的代码必须是可继续演进的真实业务代码，不允许只搭假页面或不可维护 demo。
+
+交付红线：
+
+- 可以用 mock LLM 或 fake parser 做阶段验证，但必须标明 mock 边界和替换位置。
+- 后端必须有真实 API / service / domain contract，不能只在前端写假数据。
+- 审查任务、结果和 trace 必须能持久化，不能只放进进程内内存。
+- 风险结论必须有证据，不能让 LLM 直接编正式风险。
+- AgentOrchestrator 是审查主入口，API、规则、前端不能绕过它各自生成结论。
+- 大对象必须进入 artifact store，不能无限塞进 `audit_jobs.payload`。
+- 每天必须能说明：当前是 Day 几，完成了哪条任务，哪些是真实业务代码，哪些仍是 mock。
+
+产品完整方案见：`docs/plans/product_blueprint_resume_screening.md`。
+
 ## 2. 设计文档链接
 
-执行本计划前，必须先阅读以下设计文档：
+执行本计划前，必须先阅读以下设计文档。AI 开始任何实现前，必须先声明自己正在执行 Day 几，并引用对应任务。
 
-1. `docs/plans/agent_first_routing_design.md`
+1. `docs/plans/product_blueprint_resume_screening.md`
+   - 产品定位、买点、用户场景和真实业务交付标准。
+   - Agent、证据、视觉定位、风险数据源、存储和压测的整体产品方案。
+
+2. `docs/plans/agent_first_routing_design.md`
    - `AgentOrchestrator` 是唯一审查主入口。
    - 规则是工具，不是总路由。
    - `FindingCandidate`、正式风险、`ReviewTrace` 的边界。
    - 工具失败、Agent 失败和证据失败的降级方式。
 
-2. `docs/plans/resume_review_scoring_and_presentation_design.md`
+3. `docs/plans/resume_review_scoring_and_presentation_design.md`
    - 简历库输入、已筛查简历复用、当前批次重算。
    - 评分维度、候选人分层、Top N 选择规则。
    - HR 列表页、详情页、风险和证据展示。
    - 测试数据、黄金测试集和 5000 份压测目标。
 
-3. `docs/plans/resume_review_product_flow.drawio`
+4. `docs/plans/resume_review_product_flow.drawio`
    - 产品流程图。
    - 后续实现列表页、详情页、批量任务时参考。
 
-4. `docs/suggestions/2026-05-19-architecture-review-baseline.md`
+5. `docs/suggestions/2026-05-19-architecture-review-baseline.md`
    - 架构审查红线。
    - 后续代码审查标准。
 
-5. `docs/suggestions/2026-05-19-mvp-first-plan-and-12-day-review.md`
+6. `docs/suggestions/2026-05-19-mvp-first-plan-and-12-day-review.md`
    - 为什么先做最小真实 MVP。
    - 为什么旧版 12 天计划不能继续硬推。
 
 ## 3. 执行原则
 
-- 先完成真实 MVP，再扩展批量能力。
+- 先完成真实 MVP，再扩展批量能力；MVP 是测试路径，不是低质量交付借口。
 - 不允许评分输入硬编码在 `AuditUseCase`。
 - 不允许 API route、规则或前端绕过 `AgentOrchestrator`。
 - 不允许无证据候选进入正式风险。
 - 不允许只写 worklog / acceptance 文档而没有测试或可运行验收。
 - 每天结束必须跑当天相关测试；阶段结束必须跑后端全量测试和前端 build。
-- 12 天内证据链接先用简历原文和本地模拟文件，不做真实网页搜索。
+- 12 天内证据链接先用简历原文和本地模拟文件，不把真实网页搜索作为 Day 1-10 阻塞项；但要预留 `web_search_runs` / artifact 接口位置。
 - 压测采用分级策略：100 -> 500 -> 1000 -> 5000，不直接跳到 5000。
+- 每个 Day 都必须更新 worklog，记录真实完成、mock 边界、阻断点和下一步。
 
 ## 4. 当前代码已具备的基础
 
@@ -85,6 +110,111 @@ MVP 必须真实闭环：
 - `AuditUseCase` 中评分输入仍有演示硬编码。
 - 规则工具和 scoring signal 没有完整打通。
 - 简历库状态、批量任务、黄金测试集和压测尚未完成。
+
+
+## 4.1 AI 执行控制协议
+
+后续让 AI 搭建代码时，必须使用以下控制协议，避免跳阶段、乱扩展或只做 demo。
+
+### 4.1.1 每次任务开始前必须声明
+
+AI 在动代码前必须输出：
+
+```text
+当前执行：Day X - [标题]
+本次范围：对应 12_day_execution_plan.md 的哪几条任务
+不做范围：明确列出本次不做哪些后续阶段功能
+真实交付：本次完成后哪些能力可以真实运行
+Mock 边界：本次仍有哪些 mock，以及替换点在哪里
+验证方式：准备新增/运行哪些测试
+```
+
+如果 AI 不能把任务对应到 Day X，就不能开始写代码，应先回到计划文档澄清。
+
+### 4.1.2 每次任务结束时必须汇报
+
+AI 结束时必须汇报：
+
+```text
+完成 Day X 的哪些条目
+修改文件列表
+新增测试列表
+验证命令和结果
+仍然是 mock 的部分
+真实可用的部分
+对后续 Day 的影响
+下一步建议执行 Day X 的哪一条
+```
+
+### 4.1.3 不允许的行为
+
+- 不允许越过 Day 1-6 直接做 5000 份压测。
+- 不允许在没有 artifact 分层时把 LLM / 网页搜索大内容塞进 job JSON。
+- 不允许为了展示效果写前端假数据冒充后端能力。
+- 不允许绕过 `AgentOrchestrator` 直接在 API route 里拼审查结论。
+- 不允许把“有 mock”说成“生产完成”。
+- 不允许只更新文档不补测试。
+
+### 4.1.4 允许的 MVP 手段
+
+- 可以用 fake parser 验证文档解析接口，但必须保持 `DocumentParser` 可替换。
+- 可以用 LLM mock 验证 Agent 候选发现，但必须记录 trace。
+- 可以用本地模拟证据库替代真实联网搜索，但证据结构必须和未来 web evidence 兼容。
+- 可以先用 SQLite，但必须区分结构化状态和 artifact 大对象。
+
+## 4.2 产品化交付标准
+
+每个 Day 的交付都要按“真实业务代码”判断，而不是按“页面能看”判断。
+
+### 4.2.1 后端标准
+
+- 有 domain model 或 schema。
+- 有 service/use case。
+- 有 API 或明确被 API 调用的服务层。
+- 有错误处理和失败状态。
+- 有持久化或明确的 artifact 引用。
+- 有至少一个自动化测试覆盖主行为。
+
+### 4.2.2 前端标准
+
+- 通过 API 读取真实后端结果。
+- 能展示 loading / failed / completed 状态。
+- 风险、证据、评分和 trace 不应写死。
+- 如果暂时没有真实 PDF 高亮，也必须展示 page、block、bbox 和 quote，为视觉定位打基础。
+
+### 4.2.3 Agent 标准
+
+- Agent 调用必须进入 `ReviewTrace`。
+- 每个工具 step 必须有 input_summary、output_summary、status。
+- 工具失败不能导致整份简历审查失败，除非该工具是必要前置步骤。
+- Agent 发现的风险必须先是 candidate，再经过 evidence gate。
+
+### 4.2.4 存储标准
+
+- job 状态必须重启后可查。
+- 大对象必须写 artifact，不进入主 job payload。
+- artifact 必须有类型、路径、hash 或大小信息。
+- 后续迁移 PostgreSQL / 对象存储时，业务层不应大改。
+
+## 4.3 产品主线检查表
+
+每完成一天，都检查下面主线是否仍然连贯：
+
+```text
+岗位模板
+  -> 简历输入
+  -> 文档解析
+  -> Agent 主流程
+  -> 候选风险
+  -> 证据校验
+  -> 正式风险 / rejected candidate
+  -> 评分和分层
+  -> 可视化证据定位
+  -> 持久化结果
+  -> HR 决策辅助
+```
+
+如果某一天的改动不能增强这条主线，就要谨慎判断是否偏题。
 
 ## 5. 12 天安排
 
@@ -513,3 +643,210 @@ docs/acceptance/dayN-<topic>.md
 ```
 
 如果当天测试未通过，不得把失败链路继续堆到后续天数。
+## 9. 按天真实交付定义
+
+本节用于补充第 5 节的 12 天安排，避免 AI 只按标题做表面实现。每一天都要有明确的产品意义、工程边界和验收方式。
+
+### Day 1 真实交付定义：数据契约不是类型堆砌
+
+Day 1 的目标不是单纯新增几个 Pydantic class，而是让后续所有链路围绕稳定对象协作。
+
+交付后应该能回答：
+
+- 一份简历在系统里如何表示？
+- 一次审查任务如何表示？
+- 一个岗位模板如何影响审查？
+- 一个风险候选和正式风险有什么区别？
+- trace 如何记录审查过程？
+- 大对象未来如何通过 artifact 引用？
+
+Day 1 不要求完整 UI，但必须有测试证明核心对象能序列化、校验、被 use case 使用。
+
+### Day 2 真实交付定义：AgentOrchestrator 成为唯一主入口
+
+Day 2 完成后，审查流程不能再散落在 API route、规则工具和前端里。
+
+所有风险发现都应进入：
+
+```text
+AuditUseCase -> AgentOrchestrator.review(document, job_template, context)
+```
+
+如果新增工具，也必须由 orchestrator 调用，并进入 trace。
+
+Day 2 的重点是路由干净，不是工具数量多。
+
+### Day 3 真实交付定义：候选风险和正式风险分离
+
+Day 3 完成后，系统必须清楚区分：
+
+- `FindingCandidate`：Agent 或工具发现的可能问题。
+- `AuditFinding`：经过 evidence gate 的正式风险。
+- `rejected_candidates`：因为证据不足或置信度不足被拒绝的候选。
+
+这一天是“靠谱”的关键。如果没有 evidence gate，AuditX 就会退化成 LLM 生成风险文案。
+
+### Day 4 真实交付定义：评分必须来自真实 signal
+
+Day 4 完成后，评分不能再依赖演示硬编码。
+
+评分至少应读取：
+
+- 岗位模板权重。
+- 简历解析结果。
+- 正式 findings。
+- 优势词典命中。
+- 风险数量和风险等级。
+
+评分输出必须包含 calculation details，让 HR 知道分数怎么来的。
+
+### Day 5 真实交付定义：详情页服务 HR 复核
+
+Day 5 的前端不是“把 JSON 打印出来”，而是做单份简历复核工作台。
+
+至少应展示：
+
+- 审查状态。
+- 总分和分层。
+- 优势标签。
+- 风险列表。
+- 每个风险的 quote、page、block、bbox。
+- rejected candidates。
+- trace step。
+
+如果还没有 PDF 高亮，也必须把定位字段展示出来，为后续视觉定位打基础。
+
+### Day 6 真实交付定义：MVP 闭环验收
+
+Day 6 不新增大功能，只做闭环验证和缺口修复。
+
+必须验证：
+
+- 后端全量测试通过。
+- 前端 build 通过。
+- 单份简历可以从 API 到前端完成审查。
+- 任务结果重启后仍可查。
+- trace 覆盖 Agent、工具、evidence gate、scoring。
+- worklog 写清楚哪些仍是 mock。
+
+Day 6 结束时必须给出 go / no-go：是否进入批量阶段。
+
+### Day 7 真实交付定义：测试数据是产品资产
+
+Day 7 不是随便造几份假简历，而是建立可回归的样本体系。
+
+黄金集要覆盖：
+
+- 最优候选。
+- 次优但有潜力。
+- 不建议。
+- 信息缺失。
+- 时间冲突。
+- 学历不足但其他优势强。
+- 岗位切换后分层变化。
+
+这些样本后续用于防止规则和 Agent 改动导致结果漂移。
+
+### Day 8 真实交付定义：简历库是批量能力基础
+
+Day 8 的目标是从“临时文件审查”升级到“简历入库”。
+
+完成后应该支持：
+
+- 导入简历形成 `ResumeRecord`。
+- 状态为 `new`、`reviewed`、`shortlisted`。
+- 能按状态筛选。
+- 已筛查简历可以复用历史解析结果。
+- 当前岗位可以重新审查同一份简历。
+
+这一天开始，存储就不能只围绕 audit job，要准备 resume repository。
+
+### Day 9 真实交付定义：列表页让 HR 控制输入和结果
+
+Day 9 要做 HR 可以使用的列表体验。
+
+列表页至少支持：
+
+- 查看简历库。
+- 选择输入。
+- 查看审查状态。
+- 查看分层和分数。
+- 查看优势标签和风险数量。
+- 点击进入详情。
+
+这一天不要追求复杂筛选，但要保证列表不是一次性写死数据。
+
+### Day 10 真实交付定义：批量任务和 Top N 能跑小批量
+
+Day 10 目标是让系统处理一批简历，而不是把单份流程循环调用后不管状态。
+
+必须支持：
+
+- batch 创建。
+- batch item 状态。
+- 单份失败不影响整批。
+- 当前批次 Top N。
+- N 可配置，默认 20。
+- Top N 计算有可解释排序依据。
+
+### Day 11 真实交付定义：证据库和分级压测
+
+Day 11 开始验证系统强度。
+
+本地证据库要模拟未来联网搜索：
+
+- 有 evidence source。
+- 有 artifact。
+- 有命中摘要。
+- 有未命中记录。
+
+压测必须按 100、500、1000 分级，不稳定就停下来记录原因。
+
+### Day 12 真实交付定义：5000 份压测或阻断报告
+
+Day 12 不允许虚报。
+
+如果 1000 份稳定，再跑 5000。
+
+如果 5000 失败，也可以接受，但必须产出：
+
+- 失败阶段。
+- 失败原因。
+- 数据库或 artifact 瓶颈。
+- API 或前端瓶颈。
+- 下一步修复建议。
+
+真实的阻断报告比假的“完成 5000”更有价值。
+
+## 10. 给 AI 的固定 Prompt 模板
+
+后续每次让 AI 继续开发，可以使用下面模板：
+
+```text
+你是 AuditX 的高级工程师。请先阅读：
+
+1. docs/plans/product_blueprint_resume_screening.md
+2. docs/plans/12_day_execution_plan.md
+3. docs/strategy/current_execution_focus.md
+4. docs/worklog/worklog-5-20.md
+5. 注意点.md
+
+必须按照 12 天计划推进。开始前先声明当前执行 Day 几、本次范围、不做范围、真实交付、Mock 边界和验证方式。
+
+本次只执行 Day X 的以下任务：[写清楚任务]
+
+要求：
+- 交付真实业务代码，不要只搭 demo。
+- 可以用 mock 做测试，但必须标明替换点。
+- 不要跳到后续 Day。
+- 不要做真实联网搜索，除非当前 Day 明确要求。
+- 不要做 5000 份压测，除非已经到 Day 12 且前置压测通过。
+- 风险必须有 evidence gate。
+- AgentOrchestrator 必须是审查主入口。
+- 大对象必须进入 artifact，不要塞进 job payload。
+- 先写测试，再实现。
+- 更新 worklog。
+- 完成后运行测试和构建，并汇报真实完成与遗留风险。
+```
+
+这个模板的目的是让 AI 始终按 12 天计划推进，而不是根据上下文随机发挥。

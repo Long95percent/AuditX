@@ -1,6 +1,5 @@
-﻿import type { AuditJob, JobTemplate } from "../types/audit";
-
-const API_BASE_URL = "http://127.0.0.1:8765";
+import { API_BASE_URL } from "../config";
+import type { AuditJob, JobTemplate } from "../types/audit";
 
 export interface HealthStatus {
   status: string;
@@ -51,6 +50,10 @@ export async function createAuditJob(filePath: string): Promise<AuditJob> {
     method: "POST",
     body: JSON.stringify({ file_path: filePath }),
   });
+}
+
+export async function getAuditJob(jobId: string): Promise<AuditJob> {
+  return requestJson<AuditJob>(`/api/audit-jobs/${jobId}`);
 }
 
 export async function getHealthStatus(): Promise<HealthStatus> {

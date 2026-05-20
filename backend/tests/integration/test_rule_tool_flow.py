@@ -18,7 +18,13 @@ def test_orchestrator_runs_rule_tools_and_records_trace_without_bypassing_agent(
     draft = orchestrator.review(document)
 
     assert any(step.name == "resume.rule.contact_missing" for step in draft.trace.steps)
-    assert any(candidate.candidate_id == "rule_contact_missing" for candidate in draft.rejected_candidates)
+    rejected = next(
+        candidate
+        for candidate in draft.rejected_candidates
+        if candidate.candidate_id == "rule_contact_missing"
+    )
+    assert rejected.source_agent == "resume.rule.contact_missing"
+    assert rejected.rejection_reason == "missing verified evidence"
     assert all(finding.finding_id != "rule_contact_missing" for finding in draft.findings)
 
 

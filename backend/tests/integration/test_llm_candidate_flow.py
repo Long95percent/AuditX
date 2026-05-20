@@ -25,3 +25,26 @@ def test_orchestrator_accepts_evidence_backed_llm_candidate_and_rejects_unverifi
         and step.status == "rejected"
         for step in draft.trace.steps
     )
+
+
+def test_rejected_llm_candidate_keeps_source_and_rejection_reason() -> None:
+    document = FakeDocumentParser().parse("demo_resume.pdf")
+    registry = ToolRegistry()
+    registry.register(LLMCandidateTool())
+    orchestrator = AgentOrchestrator(tool_registry=registry)
+
+    draft = orchestrator.review(document)
+
+    rejected = next(
+        candidate
+        for candidate in draft.rejected_candidates
+        if candidate.candidate_id == "llm_candidate_unverified_gap"
+    )
+    assert rejected.source_agent == "llm_mock"
+    assert rejected.rejection_reason == "missing verified evidence"
+    assert any(
+        step.metadata.get("candidate_id") == rejected.candidate_id
+        and step.metadata.get("source_agent") == "llm_mock"
+        and step.metadata.get("rejection_reason") == "missing verified evidence"
+        for step in draft.trace.steps
+    )
