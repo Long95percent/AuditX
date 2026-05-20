@@ -93,6 +93,15 @@ class JobTemplate(BaseModel):
         )
 
 
+class ScoringSignal(BaseModel):
+    signal_id: str = Field(min_length=1)
+    category: str = Field(min_length=1)
+    value: float | str | bool = 1
+    source_step: str = Field(min_length=1)
+    source_agent: str = Field(min_length=1)
+    reason: str = ""
+
+
 class CandidateScoreInput(BaseModel):
     candidate_id: str = Field(min_length=1)
     completeness: float = Field(default=0, ge=0, le=1)
@@ -100,6 +109,7 @@ class CandidateScoreInput(BaseModel):
     ability_match: float = Field(default=0, ge=0, le=1)
     experience_relevance: float = Field(default=0, ge=0, le=1)
     advantage_signals: list[str] = Field(default_factory=list)
+    scoring_signals: list[ScoringSignal] = Field(default_factory=list)
     risk_count: int = Field(default=0, ge=0)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     precomputed_total_score: float | None = None
@@ -164,6 +174,10 @@ class ScoringEngine:
             f"advantage_bonus={advantage_bonus}",
             f"risk_penalty={risk_penalty}",
         ]
+        details.extend(
+            f"signal:{signal.signal_id} source={signal.source_step}"
+            for signal in score_input.scoring_signals
+        )
         if dimension_scores["hard_requirement_match"] < 60:
             details.append("hard_requirement_low_not_eliminated")
         return ScoreResult(

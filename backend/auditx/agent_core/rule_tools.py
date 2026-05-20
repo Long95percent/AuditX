@@ -5,7 +5,7 @@ from typing import Any
 from auditx.domain.audit import RiskLevel
 from auditx.domain.documents import ParsedDocument
 from auditx.domain.review import FindingCandidate
-from auditx.domain.scoring import JobTemplate
+from auditx.domain.scoring import JobTemplate, ScoringSignal
 from auditx.tool_registry.base import Tool, ToolResult
 
 
@@ -31,12 +31,24 @@ class AdvantageDictionaryTool(Tool):
         if "audit_trace" in job_template.advantage_dictionary and "审计" in text:
             signals.append("audit_trace")
         unique_signals = sorted(set(signals))
+        scoring_signals = [
+            ScoringSignal(
+                signal_id=f"advantage:{signal}",
+                category="advantage",
+                value=signal,
+                source_step=self.name,
+                source_agent=self.name,
+                reason=f"Matched advantage dictionary entry {signal}",
+            )
+            for signal in unique_signals
+        ]
         return ToolResult(
             tool_name=self.name,
             ok=True,
             data={
                 "advantage_signals": unique_signals,
                 "advantage_tags": [job_template.advantage_dictionary[signal] for signal in unique_signals],
+                "scoring_signals": scoring_signals,
             },
         )
 
@@ -103,10 +115,23 @@ class YearsExperienceRuleTool(Tool):
         total_months = 0
         for start_year, start_month, end_year, end_month in matches:
             total_months += (int(end_year) - int(start_year)) * 12 + int(end_month) - int(start_month)
+        years_experience = round(total_months / 12)
         return ToolResult(
             tool_name=self.name,
             ok=True,
-            data={"years_experience": round(total_months / 12)},
+            data={
+                "years_experience": years_experience,
+                "scoring_signals": [
+                    ScoringSignal(
+                        signal_id="experience:years",
+                        category="experience",
+                        value=years_experience,
+                        source_step=self.name,
+                        source_agent=self.name,
+                        reason="Calculated rough years of experience from resume date ranges",
+                    )
+                ],
+            },
         )
 
 
@@ -120,10 +145,24 @@ class KeywordMatchRuleTool(Tool):
     def run(self, input_data: dict[str, Any]) -> ToolResult:
         document = input_data["document"]
         text = _document_text(document)
+        matched_keywords = [keyword for keyword in self.keywords if keyword in text]
         return ToolResult(
             tool_name=self.name,
             ok=True,
-            data={"matched_keywords": [keyword for keyword in self.keywords if keyword in text]},
+            data={
+                "matched_keywords": matched_keywords,
+                "scoring_signals": [
+                    ScoringSignal(
+                        signal_id=f"keyword:{keyword}",
+                        category="hard_requirement",
+                        value=keyword,
+                        source_step=self.name,
+                        source_agent=self.name,
+                        reason=f"Matched resume keyword {keyword}",
+                    )
+                    for keyword in matched_keywords
+                ],
+            },
         )
 
 

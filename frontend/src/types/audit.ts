@@ -39,6 +39,16 @@ export interface FindingCandidate {
   evidences: Evidence[];
   suggestion: string;
   source_agent: string;
+  rejection_reason?: string | null;
+}
+
+export interface ScoringSignal {
+  signal_id: string;
+  category: string;
+  value: number | string | boolean;
+  source_step: string;
+  source_agent: string;
+  reason: string;
 }
 
 export type ReviewStepStatus = "started" | "accepted" | "rejected" | "failed";

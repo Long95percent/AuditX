@@ -18,6 +18,10 @@ def test_advantage_dictionary_tool_returns_scoring_signals() -> None:
     assert result.ok is True
     assert "audit_trace" in result.data["advantage_signals"]
     assert "审查链路意识" in result.data["advantage_tags"]
+    signal = result.data["scoring_signals"][0]
+    assert signal.signal_id == "advantage:audit_trace"
+    assert signal.category == "advantage"
+    assert signal.source_step == "resume.job.advantage_dictionary"
 
 
 def test_contact_missing_rule_returns_finding_candidate() -> None:
@@ -43,6 +47,11 @@ def test_years_experience_rule_returns_scoring_signal() -> None:
 
     assert result.ok is True
     assert result.data["years_experience"] == 2
+    signal = result.data["scoring_signals"][0]
+    assert signal.signal_id == "experience:years"
+    assert signal.category == "experience"
+    assert signal.value == 2
+    assert signal.source_step == "resume.rule.years_experience"
 
 
 def test_keyword_match_rule_returns_scoring_signal() -> None:
@@ -51,3 +60,7 @@ def test_keyword_match_rule_returns_scoring_signal() -> None:
 
     assert result.ok is True
     assert result.data["matched_keywords"] == ["合规审计"]
+    signal = result.data["scoring_signals"][0]
+    assert signal.signal_id == "keyword:合规审计"
+    assert signal.category == "hard_requirement"
+    assert signal.source_step == "resume.rule.keyword_match"

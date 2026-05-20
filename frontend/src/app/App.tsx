@@ -17,6 +17,16 @@ function formatBBox(bbox: { x0: number; y0: number; x1: number; y1: number }) {
   return `x0=${bbox.x0}, y0=${bbox.y0}, x1=${bbox.x1}, y1=${bbox.y1}`;
 }
 
+function formatMetadataValue(value: unknown) {
+  if (value === null || value === undefined) {
+    return "";
+  }
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+  return JSON.stringify(value);
+}
+
 async function waitForTerminalJob(jobId: string) {
   for (let attempt = 0; attempt < 10; attempt += 1) {
     const nextJob = await getAuditJob(jobId);
@@ -163,7 +173,9 @@ export function App() {
   const rejectedCandidates = job?.rejected_candidates ?? [];
   const traceSteps = job?.trace.steps ?? [];
   const acceptedTraceCount = traceSteps.filter((step) => step.status === "accepted").length;
+  const rejectedTraceCount = traceSteps.filter((step) => step.status === "rejected").length;
   const failedTraceCount = traceSteps.filter((step) => step.status === "failed").length;
+  const evidenceCount = findings.reduce((count, finding) => count + finding.evidences.length, 0);
   const backendStatus = health ? `${health.status} (${health.env})` : "offline";
 
   function openTestPanel(panel: string) {
@@ -220,12 +232,18 @@ export function App() {
                 <p>Template: {job.score.template_id}@{job.score.template_version}</p>
                 <p>Advantages: {job.score.advantage_tags.join(" / ") || "none"}</p>
                 <p>Risk count: {job.score.risk_count}</p>
+                <p>Evidence anchors: {evidenceCount}</p>
               </div>
               <div className="dimension-grid product-dimensions">
                 {Object.entries(job.score.dimension_scores).map(([name, value]) => (
                   <span key={name}>{name}: {value}</span>
                 ))}
               </div>
+              <ul className="calculation-list">
+                {job.score.calculation_details.map((detail) => (
+                  <li key={detail}>{detail}</li>
+                ))}
+              </ul>
             </div>
           ) : (
             <p className="muted-copy">Run an audit to see score, layer, advantages, and dimensions.</p>
@@ -283,17 +301,32 @@ export function App() {
           <div className="trace-summary-row">
             <span className="status-pill">Steps: {traceSteps.length}</span>
             <span className="status-pill status-online">Accepted: {acceptedTraceCount}</span>
+            <span className="status-pill">Rejected: {rejectedTraceCount}</span>
             <span className={failedTraceCount ? "status-pill status-offline" : "status-pill"}>
               Failed: {failedTraceCount}
             </span>
           </div>
           {traceSteps.length ? (
             <ol className="timeline-list product-trace-list">
-              {traceSteps.slice(0, 6).map((step) => (
-                <li key={step.step_id}>
-                  <strong>{step.name}</strong> · {step.status}
-                  {step.output_summary ? <span> · {step.output_summary}</span> : null}
-                  {step.error ? <span> · {step.error}</span> : null}
+              {traceSteps.map((step) => (
+                <li className={`trace-row trace-${step.status}`} key={step.step_id}>
+                  <div className="trace-row-header">
+                    <strong>{step.name}</strong>
+                    <span>{step.step_type} · {step.status}</span>
+                  </div>
+                  {step.input_summary ? <p>Input: {step.input_summary}</p> : null}
+                  {step.output_summary ? <p>Output: {step.output_summary}</p> : null}
+                  {step.error ? <p className="rejected-copy">Error: {step.error}</p> : null}
+                  {Object.keys(step.metadata).length ? (
+                    <dl className="metadata-grid">
+                      {Object.entries(step.metadata).map(([key, value]) => (
+                        <div key={`${step.step_id}-${key}`}>
+                          <dt>{key}</dt>
+                          <dd>{formatMetadataValue(value)}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  ) : null}
                 </li>
               ))}
             </ol>
@@ -322,7 +355,19 @@ export function App() {
                     <span>Evidence: {candidate.evidences.length}</span>
                     <span>Source: {candidate.source_agent}</span>
                   </div>
-                  <p className="rejected-copy">未进入正式风险：缺少可验证 evidence 或 bbox。</p>
+                  <p className="rejected-copy">
+                    未进入正式风险：{candidate.rejection_reason ?? "missing verified evidence"}
+                  </p>
+                  {candidate.evidences.map((evidence) => (
+                    <div className="evidence-box" key={`${candidate.candidate_id}-${evidence.block_id}`}>
+                      <strong>Candidate evidence:</strong> {evidence.quote}
+                      <br />
+                      <strong>Page:</strong> {evidence.page_number} · <strong>Block:</strong>{" "}
+                      {evidence.block_id}
+                      <br />
+                      <strong>BBox:</strong> {formatBBox(evidence.bbox)}
+                    </div>
+                  ))}
                 </article>
               ))}
             </div>
@@ -445,7 +490,14 @@ export function App() {
                       <p>Evidence count: {candidate.evidences.length}</p>
                       {job.rejected_candidates.some(
                         (rejected) => rejected.candidate_id === candidate.candidate_id,
-                      ) ? <p className="rejected-copy">Rejected: missing verified evidence</p> : null}
+                      ) ? (
+                        <p className="rejected-copy">
+                          Rejected:{" "}
+                          {job.rejected_candidates.find(
+                            (rejected) => rejected.candidate_id === candidate.candidate_id,
+                          )?.rejection_reason ?? "missing verified evidence"}
+                        </p>
+                      ) : null}
                     </article>
                   ))}
                 </div>

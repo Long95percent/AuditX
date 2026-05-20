@@ -34,6 +34,17 @@ def test_audit_job_api_creates_job_task_and_returns_findings() -> None:
     assert job_payload["document_id"] == "fake_doc_001"
     assert len(job_payload["findings"]) == 2
     assert len(job_payload["candidates"]) == 4
+    assert job_payload["score"]["total_score"] >= 0
+    assert job_payload["score"]["layer"] in {"best", "potential", "not_recommended"}
+    assert job_payload["score"]["dimension_scores"]
+    assert isinstance(job_payload["score"]["advantage_tags"], list)
+    assert job_payload["score"]["calculation_details"]
+    first_finding = job_payload["findings"][0]
+    first_evidence = first_finding["evidences"][0]
+    assert first_evidence["quote"]
+    assert first_evidence["page_number"] >= 1
+    assert first_evidence["block_id"]
+    assert set(first_evidence["bbox"]) == {"x0", "y0", "x1", "y1"}
     rejected_candidate_ids = {
         candidate["candidate_id"] for candidate in job_payload["rejected_candidates"]
     }
@@ -52,6 +63,14 @@ def test_audit_job_api_creates_job_task_and_returns_findings() -> None:
     )
     assert any(
         step["name"] == "resume.rule.contact_missing"
+        for step in job_payload["trace"]["steps"]
+    )
+    assert any(
+        step["name"] == "candidate_evidence_gate" and step["status"] == "rejected"
+        for step in job_payload["trace"]["steps"]
+    )
+    assert any(
+        step["name"] == "scoring_engine.score" and step["metadata"].get("calculation_details")
         for step in job_payload["trace"]["steps"]
     )
     assert findings_response.status_code == 200

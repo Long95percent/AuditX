@@ -6,7 +6,7 @@ from auditx.document_pipeline.base import DocumentParser
 from auditx.domain.resume_library import ReviewContext
 from auditx.domain.results import AuditResult
 from auditx.domain.review import ReviewStepStatus, ReviewTraceStep
-from auditx.domain.scoring import CandidateScoreInput, JobTemplate, ScoringEngine
+from auditx.domain.scoring import CandidateScoreInput, JobTemplate, ScoringEngine, ScoringSignal
 from auditx.tool_registry.registry import ToolRegistry
 
 
@@ -40,8 +40,11 @@ class AuditUseCase:
         normalized_findings = self.normalizer.normalize(draft.findings)
         score = None
         if self.job_template is not None:
+            score_input = self._build_score_input(
+                document.document_id, document.pages, normalized_findings, draft
+            )
             score = self.scoring_engine.score(
-                self._build_score_input(document.document_id, document.pages, normalized_findings, draft),
+                score_input,
                 self.job_template,
             )
             draft.trace.steps.append(
@@ -58,6 +61,10 @@ class AuditUseCase:
                         "total_score": score.total_score,
                         "layer": score.layer,
                         "risk_count": score.risk_count,
+                        "scoring_signals": [
+                            signal.model_dump() for signal in score_input.scoring_signals
+                        ],
+                        "calculation_details": score.calculation_details,
                     },
                 )
             )
@@ -74,23 +81,79 @@ class AuditUseCase:
     def _build_score_input(self, document_id, pages, findings, draft) -> CandidateScoreInput:
         advantage_signals: list[str] = []
         matched_keywords: list[str] = []
+        scoring_signals: list[ScoringSignal] = []
         years_experience = 0
         for step in draft.trace.steps:
             advantage_signals.extend(step.metadata.get("advantage_signals", []))
             matched_keywords.extend(step.metadata.get("matched_keywords", []))
             years_experience = max(years_experience, step.metadata.get("years_experience", 0))
+            scoring_signals.extend(
+                self._coerce_scoring_signal(signal)
+                for signal in step.metadata.get("scoring_signals", [])
+            )
 
         unique_advantage_signals = sorted(set(advantage_signals))
         unique_matched_keywords = sorted(set(matched_keywords))
         risk_count = len([finding for finding in findings if finding.risk_level != "info"])
         candidate_count = len(draft.candidates)
         accepted_count = len(findings)
+        hard_requirement_match = self._hard_requirement_match(
+            unique_matched_keywords, accepted_count, scoring_signals
+        )
+        ability_match = min(
+            1.0,
+            (
+                len(unique_advantage_signals)
+                + len(unique_matched_keywords)
+                + len([signal for signal in scoring_signals if signal.category == "advantage"])
+            )
+            / 4,
+        )
+        experience_relevance = min(
+            1.0,
+            max(
+                years_experience / 3,
+                accepted_count / 2,
+                self._experience_from_signals(scoring_signals) / 3,
+            ),
+        )
         return CandidateScoreInput(
             candidate_id=document_id,
             completeness=1.0 if pages else 0,
-            hard_requirement_match=1.0 if unique_matched_keywords or accepted_count else 0.6,
-            ability_match=min(1.0, (len(unique_advantage_signals) + len(unique_matched_keywords)) / 3),
-            experience_relevance=min(1.0, max(years_experience / 3, accepted_count / 2)),
+            hard_requirement_match=hard_requirement_match,
+            ability_match=ability_match,
+            experience_relevance=experience_relevance,
             advantage_signals=unique_advantage_signals,
+            scoring_signals=scoring_signals,
             risk_count=risk_count + len(draft.rejected_candidates) + max(0, candidate_count - accepted_count),
         )
+
+    def _coerce_scoring_signal(self, signal) -> ScoringSignal:
+        if isinstance(signal, ScoringSignal):
+            return signal
+        return ScoringSignal.model_validate(signal)
+
+    def _hard_requirement_match(
+        self,
+        matched_keywords: list[str],
+        accepted_count: int,
+        scoring_signals: list[ScoringSignal],
+    ) -> float:
+        hard_requirement_signals = [
+            signal for signal in scoring_signals if signal.category == "hard_requirement"
+        ]
+        if hard_requirement_signals:
+            return min(1.0, len(hard_requirement_signals) / 2)
+        if matched_keywords:
+            return min(1.0, len(matched_keywords) / 2)
+        if accepted_count:
+            return 0.7
+        return 0.35
+
+    def _experience_from_signals(self, scoring_signals: list[ScoringSignal]) -> float:
+        values = [
+            float(signal.value)
+            for signal in scoring_signals
+            if signal.category == "experience" and isinstance(signal.value, int | float)
+        ]
+        return max(values, default=0)
