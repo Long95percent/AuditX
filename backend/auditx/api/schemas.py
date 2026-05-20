@@ -2,6 +2,7 @@
 
 from auditx.application.audit_job_service import AuditJobStatus
 from auditx.domain.audit import AuditFinding
+from auditx.domain.artifacts import ArtifactRef
 from auditx.domain.review import FindingCandidate, ReviewTrace
 from auditx.domain.scoring import ScoreResult
 
@@ -23,6 +24,7 @@ class AuditJobResponse(BaseModel):
     rejected_candidates: list[FindingCandidate] = Field(default_factory=list)
     score: ScoreResult | None = None
     trace: ReviewTrace = Field(default_factory=ReviewTrace)
+    artifacts: list[ArtifactRef] = Field(default_factory=list)
     error: str | None = None
 
 

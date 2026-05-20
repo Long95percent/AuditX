@@ -7,6 +7,7 @@ from auditx.domain.resume_library import ReviewContext
 from auditx.domain.results import AuditResult
 from auditx.domain.review import ReviewStepStatus, ReviewTraceStep
 from auditx.domain.scoring import CandidateScoreInput, JobTemplate, ScoringEngine, ScoringSignal
+from auditx.infrastructure.storage.artifact_store import FileSystemArtifactStore
 from auditx.tool_registry.registry import ToolRegistry
 
 
@@ -29,8 +30,23 @@ class AuditUseCase:
         self.job_template = job_template
         self.scoring_engine = scoring_engine or ScoringEngine()
 
-    def run(self, file_path: str) -> AuditResult:
-        document = self.parser.parse(file_path)
+    def run(
+        self,
+        file_path: str,
+        job_id: str | None = None,
+        artifact_store: FileSystemArtifactStore | None = None,
+    ) -> AuditResult:
+        artifacts = []
+        if job_id is not None and artifact_store is not None and hasattr(
+            self.parser, "parse_with_artifacts"
+        ):
+            document, artifacts = self.parser.parse_with_artifacts(  # type: ignore[attr-defined]
+                file_path=file_path,
+                artifact_store=artifact_store,
+                owner_id=job_id,
+            )
+        else:
+            document = self.parser.parse(file_path)
         context = ReviewContext(job_template=self.job_template) if self.job_template is not None else None
         draft = AgentOrchestrator(
             extractor=self.extractor,
@@ -76,6 +92,7 @@ class AuditUseCase:
             rejected_candidates=draft.rejected_candidates,
             score=score,
             trace=draft.trace,
+            artifacts=artifacts,
         )
 
     def _build_score_input(self, document_id, pages, findings, draft) -> CandidateScoreInput:

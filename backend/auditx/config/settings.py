@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     llm_provider: str = "none"
     llm_model: str = ""
     llm_api_key: str = ""
-    ocr_provider: str = "none"
+    ocr_provider: str = "paddleocr"
 
 
 @lru_cache(maxsize=1)

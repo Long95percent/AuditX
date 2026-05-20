@@ -1,0 +1,1 @@
+{"document_id":"ocr_80938af2-48aa-548e-93f1-f3ebb3e35f3a","filename":"backend\\tests\\fixtures\\demo_resume.png","pages":[{"page_number":1,"width":110.0,"height":50.0,"blocks":[{"block_id":"p1_ocr_1","page_number":1,"block_type":"paragraph","text":"候选人负责合规审计项目","bbox":{"x0":10.0,"y0":20.0,"x1":110.0,"y1":50.0}}]}]}

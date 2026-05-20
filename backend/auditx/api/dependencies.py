@@ -16,9 +16,12 @@ from auditx.application.audit_job_service import AuditJobService
 from auditx.application.audit_use_case import AuditUseCase
 from auditx.application.openai_settings_service import OpenAISettingsService
 from auditx.config.settings import get_settings
+from auditx.document_pipeline.base import DocumentParser
 from auditx.document_pipeline.fake_parser import FakeDocumentParser
+from auditx.document_pipeline.paddleocr_parser import PaddleOCRDocumentParser
 from auditx.domain.scoring import JobTemplate
 from auditx.infrastructure.storage.audit_job_repository import SQLiteAuditJobRepository
+from auditx.infrastructure.storage.artifact_store import FileSystemArtifactStore
 from auditx.tool_registry.registry import ToolRegistry
 
 
@@ -41,11 +44,20 @@ def get_audit_job_service() -> AuditJobService:
     tool_registry.register(KeywordMatchRuleTool())
     return AuditJobService(
         repository=SQLiteAuditJobRepository(Path(settings.storage_dir) / "audit_jobs.sqlite3"),
+        artifact_store=FileSystemArtifactStore(Path(settings.storage_dir) / "artifacts"),
         use_case=AuditUseCase(
-            parser=FakeDocumentParser(),
+            parser=build_document_parser(settings.ocr_provider),
             extractor=extractor,
             normalizer=FindingNormalizer(),
             tool_registry=tool_registry,
             job_template=JobTemplate.sample_frontend(),
         ),
     )
+
+
+def build_document_parser(ocr_provider: str) -> DocumentParser:
+    if ocr_provider == "fake":
+        return FakeDocumentParser()
+    if ocr_provider == "paddleocr":
+        return PaddleOCRDocumentParser()
+    raise ValueError(f"Unsupported OCR provider: {ocr_provider}")

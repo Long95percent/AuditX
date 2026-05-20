@@ -1,4 +1,6 @@
 from enum import StrEnum
+import inspect
+from pathlib import Path
 from typing import Protocol
 from uuid import uuid4
 
@@ -6,9 +8,11 @@ from pydantic import BaseModel, Field
 
 from auditx.application.audit_use_case import AuditUseCase
 from auditx.domain.audit import AuditFinding
+from auditx.domain.artifacts import ArtifactRef
 from auditx.domain.review import FindingCandidate, ReviewTrace
 from auditx.domain.results import AuditResult
 from auditx.domain.scoring import ScoreResult
+from auditx.infrastructure.storage.artifact_store import FileSystemArtifactStore
 
 
 class AuditJobStatus(StrEnum):
@@ -29,6 +33,7 @@ class AuditJob(BaseModel):
     rejected_candidates: list[FindingCandidate] = Field(default_factory=list)
     score: ScoreResult | None = None
     trace: ReviewTrace = Field(default_factory=ReviewTrace)
+    artifacts: list[ArtifactRef] = Field(default_factory=list)
     error: str | None = None
 
 
@@ -56,9 +61,11 @@ class AuditJobService:
         self,
         use_case: AuditUseCase,
         repository: AuditJobRepository | None = None,
+        artifact_store: FileSystemArtifactStore | None = None,
     ) -> None:
         self.use_case = use_case
         self.repository = repository or InMemoryAuditJobRepository()
+        self.artifact_store = artifact_store
 
     def create(self, file_path: str) -> AuditJob:
         job = AuditJob(job_id=str(uuid4()), file_path=file_path, status=AuditJobStatus.pending)
@@ -77,7 +84,8 @@ class AuditJobService:
         job.status = AuditJobStatus.running
         self.repository.save(job)
         try:
-            result = self.use_case.run(file_path=job.file_path)
+            self._capture_source_document(job)
+            result = self._run_use_case(job)
             self._apply_result(job, result)
         except Exception as exc:
             job.status = AuditJobStatus.failed
@@ -102,3 +110,31 @@ class AuditJobService:
         job.rejected_candidates = result.rejected_candidates
         job.score = result.score
         job.trace = result.trace
+        job.artifacts.extend(result.artifacts)
+
+    def _run_use_case(self, job: AuditJob) -> AuditResult:
+        parameters = inspect.signature(self.use_case.run).parameters
+        if "job_id" in parameters or "artifact_store" in parameters:
+            return self.use_case.run(
+                file_path=job.file_path,
+                job_id=job.job_id,
+                artifact_store=self.artifact_store,
+            )
+        return self.use_case.run(file_path=job.file_path)
+
+    def _capture_source_document(self, job: AuditJob) -> None:
+        if self.artifact_store is None:
+            return
+        path = Path(job.file_path)
+        if not path.is_file():
+            return
+        artifact = self.artifact_store.write_bytes(
+            owner_type="job",
+            owner_id=job.job_id,
+            artifact_type="source_document",
+            filename=path.name,
+            content=path.read_bytes(),
+            content_type="application/pdf" if path.suffix.lower() == ".pdf" else "application/octet-stream",
+        )
+        job.artifacts.append(artifact)
+        self.repository.save(job)

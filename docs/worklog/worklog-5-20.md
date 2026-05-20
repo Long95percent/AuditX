@@ -68,3 +68,55 @@
 - 遗留风险：真实 OCR/parser、真实 LLM provider、PDF bbox 高亮和 artifact 大对象拆分仍待后续 Day/阶段处理。
 - 最终验证：`uv run pytest backend/tests -q -p no:cacheprovider`，55 passed；`npm.cmd --prefix frontend run build`，TypeScript 与 Vite build 成功。
 - Go/No-Go：Go，允许进入 Day7 测试数据和黄金集阶段。
+## 遗留链路补强：Artifact、PaddleOCR 接口、PDF 预览
+
+- 本轮范围：补齐 artifact 大对象拆分基础、PaddleOCR parser seam、源 PDF artifact、受控 PDF endpoint、前端 PDF preview 和 evidence bbox 高亮信息卡。
+- Artifact：新增 `ArtifactRef` 与 `FileSystemArtifactStore`，审查任务运行时把源 PDF 写为 `source_document` artifact，job/API 只保存 artifact refs。
+- OCR：新增 `PaddleOCRDocumentParser`，使用懒加载；未安装 PaddleOCR 时明确报错。`pyproject.toml` 增加 optional `ocr` 依赖组，真实启用时运行 `uv sync --extra ocr`。
+- PDF 展示：新增 `GET /api/audit-jobs/{job_id}/document` 受控返回源 PDF；前端用 PDF object preview 展示源文件，并显示 evidence page/block/bbox 高亮信息。
+- LLM/API：LLM 仍先放着，API key 由用户填写；没有把真实 LLM 接入主链路。
+- 后续已闭环：默认 parser 已切换 PaddleOCR；PDF 精准 overlay 已引入 `pdfjs-dist`；真实 OCR 已写入 `ocr_raw` 与 `parsed_document` artifacts。
+- 验证：定向 artifact/service/parser/API 测试 4 passed；`uv run pytest backend/tests -q -p no:cacheprovider`，58 passed；`npm.cmd --prefix frontend run build` 成功。
+## 真实 OCR 默认链路切换
+
+- 默认 OCR provider 已从占位切换为 `paddleocr`，依赖层新增 `build_document_parser()`，测试可通过 `AUDITX_OCR_PROVIDER=fake` 使用 fake parser。
+- 已执行 `uv sync --extra ocr` 安装 PaddleOCR/PaddlePaddle optional 依赖。
+- 修复 PaddleX 默认缓存目录无权限问题：`PaddleOCRDocumentParser` 在导入前设置 `PADDLE_PDX_CACHE_HOME=.data/paddlex_cache`。
+- 验证 PaddleOCR 实例化成功，并下载模型到 `.data/paddlex_cache`。
+- 回归验证：`$env:AUDITX_OCR_PROVIDER='fake'; uv run pytest backend/tests -q -p no:cacheprovider`，60 passed；`npm.cmd --prefix frontend run build` 成功。
+- 注意：常规自动化测试仍用 fake parser 避免真实 OCR 下载/耗时；真实运行默认走 PaddleOCR。
+## OCR Raw 与 ParsedDocument Artifact 闭环
+
+- 新增 `PaddleOCRDocumentParser.parse_with_artifacts()`，真实 OCR 路径会写入 `ocr_raw` 和 `parsed_document` artifacts。
+- `AuditJobService` 现在把 `job_id` 和 `artifact_store` 传入 `AuditUseCase.run()`，同时兼容旧测试 stub。
+- `AuditUseCase` 检测 parser 支持 `parse_with_artifacts` 时使用 artifact-aware parse，并把 artifacts 写回 `AuditResult`。
+- `FileSystemArtifactStore` 新增 `write_json()`，用于保存 OCR raw JSON。
+- 验证：parser/artifact/dependency 定向测试 5 passed；`$env:AUDITX_OCR_PROVIDER='fake'; uv run pytest backend/tests -q -p no:cacheprovider`，62 passed；`npm.cmd --prefix frontend run build` 成功。
+## 真实 PDF OCR 验证
+
+- 使用用户提供的 `简历.pdf` 进行 PaddleOCR 端到端验证。
+- 发现并修复 PaddleOCR 3.5 调用兼容问题：改用 `predict()` 并兼容 `rec_texts`/`rec_polys` 输出。
+- 发现 PDF 直传 PaddleOCR 超时/执行异常，改为先用 `pypdfium2` 渲染 PDF 页面为 `.data/ocr_tmp/<pdf>_page_N.png`，再对图片运行 OCR。
+- 将 PaddlePaddle 锁定为 `3.0.0`，规避 `3.3.1` 在当前 Windows 环境下的 `ConvertPirAttribute2RuntimeAttribute` 执行错误。
+- 真实 OCR 结果：1 页，52 个 OCR blocks，成功写入 `ocr_raw` artifact 约 12014 bytes、`parsed_document` artifact 约 10162 bytes。
+- 回归验证：`$env:AUDITX_OCR_PROVIDER='fake'; uv run pytest backend/tests -q -p no:cacheprovider`，64 passed；`npm.cmd --prefix frontend run build` 成功。
+
+## PDF 展示与精准高亮闭环
+
+- 本次范围：只补 PDF 展示、parsed artifact 读取、evidence bbox overlay 高亮，不接真实 LLM，不进入批量/Top N/简历库。
+- 后端新增 `GET /api/audit-jobs/{job_id}/parsed-document`，从 `parsed_document` artifact 返回 OCR layout；job payload 仍只保留 artifact refs。
+- PaddleOCR PDF 渲染链路现在把 `pypdfium2` 输出图片的真实 `page_width/page_height` 写入 parsed document，避免前端 overlay 使用 bbox 最大值导致比例误差。
+- 前端新增 `PdfEvidenceViewer`，使用 `pdfjs-dist` canvas 展示 PDF，并按 parsed page 尺寸缩放 evidence bbox 生成精准高亮层。
+- Finding evidence 增加 `Highlight in PDF` 操作，点击后更新主 PDF 视图、跳到 evidence 页并显示高亮框。
+- Mock 边界：测试可继续用 `AUDITX_OCR_PROVIDER=fake`；真实 OCR/PDF layout artifact 由 PaddleOCR 链路生成，LLM 仍保持关闭等待 API 配置。
+- 已运行验证：`$env:AUDITX_OCR_PROVIDER='fake'; $env:UV_CACHE_DIR='.uv-cache'; uv run pytest backend/tests/integration/test_audit_jobs_api.py -q -p no:cacheprovider`，6 passed；`$env:UV_CACHE_DIR='.uv-cache'; uv run pytest backend/tests/unit/test_paddleocr_parser.py -q -p no:cacheprovider`，5 passed；`npm.cmd --prefix frontend run build` 成功。
+
+## 批量筛选系统体系计划
+
+- 本次范围：只做系统体系梳理、下一阶段模块边界设计和代码改造清单，不改后端/前端业务代码，不落数据库表。
+- 新增计划文档：`docs/plans/batch_system_architecture_plan.md`，明确单份审查、简历库、候选人画像、证据索引、批量任务、排名筛选、前端工作台、Agent 插槽边界。
+- 当前判断：AuditX 已完成单份 PDF/OCR/artifact/evidence/score/trace/PDF 高亮闭环，但仍不是大批量并行筛选系统。
+- 下一阶段顺序：先领域契约和 repository seam，再简历库 service、候选人查询 service、批次 service、API 边界、前端信息架构，最后再进入 SQLite schema 和 Agent 插槽。
+- 红线：不把批量逻辑塞进 `AuditJob.payload`，不把大对象塞进数据库主表，不在没有批次、队列、失败隔离、Top N、压测证据前宣称支持大批量并行。
+- Mock/延后边界：LLM 真实接入、复杂 Agent、自主 tool runtime、并发 worker、压测报告均延后；后续代码阶段必须遵守 TDD。
+- 验证：本轮为文档设计交付，未运行后端测试和前端构建；进入代码修改阶段后再运行 `uv run pytest backend/tests -q -p no:cacheprovider` 与 `npm.cmd --prefix frontend run build`。

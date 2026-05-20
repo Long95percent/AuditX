@@ -1,6 +1,7 @@
 ﻿from pydantic import BaseModel, Field
 
 from auditx.domain.audit import AuditFinding
+from auditx.domain.artifacts import ArtifactRef
 from auditx.domain.documents import ParsedDocument
 from auditx.domain.review import FindingCandidate, ReviewTrace
 from auditx.domain.scoring import ScoreResult
@@ -14,3 +15,4 @@ class AuditResult(BaseModel):
     rejected_candidates: list[FindingCandidate] = Field(default_factory=list)
     score: ScoreResult | None = None
     trace: ReviewTrace = Field(default_factory=ReviewTrace)
+    artifacts: list[ArtifactRef] = Field(default_factory=list)

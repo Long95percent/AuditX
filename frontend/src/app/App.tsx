@@ -11,7 +11,8 @@ import {
   type HealthStatus,
   type OpenAISettingsStatus,
 } from "../api/auditJobs";
-import type { AuditJob, JobTemplate } from "../types/audit";
+import type { AuditJob, Evidence, JobTemplate } from "../types/audit";
+import { PdfEvidenceViewer } from "./PdfEvidenceViewer";
 
 function formatBBox(bbox: { x0: number; y0: number; x1: number; y1: number }) {
   return `x0=${bbox.x0}, y0=${bbox.y0}, x1=${bbox.x1}, y1=${bbox.y1}`;
@@ -61,6 +62,7 @@ export function App() {
   const [jobTemplateName, setJobTemplateName] = useState("");
   const [jobTemplateJD, setJobTemplateJD] = useState("");
   const [generatedTemplate, setGeneratedTemplate] = useState<JobTemplate | null>(null);
+  const [selectedEvidence, setSelectedEvidence] = useState<Evidence | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function refreshHealth() {
@@ -104,6 +106,7 @@ export function App() {
       if (typeof selected === "string") {
         setSelectedFilePath(selected);
         setJob(null);
+        setSelectedEvidence(null);
       }
     } catch (pickError) {
       setError(pickError instanceof Error ? pickError.message : "Unable to open file picker");
@@ -126,7 +129,9 @@ export function App() {
       setHealth(nextHealth);
       const nextJob = await createAuditJob(selectedFilePath);
       setJob(nextJob);
-      setJob(await waitForTerminalJob(nextJob.job_id));
+      const terminalJob = await waitForTerminalJob(nextJob.job_id);
+      setJob(terminalJob);
+      setSelectedEvidence(terminalJob.findings.flatMap((finding) => finding.evidences)[0] ?? null);
     } catch (auditError) {
       setError(auditError instanceof Error ? auditError.message : "Unknown audit error");
     } finally {
@@ -256,6 +261,19 @@ export function App() {
           <p>Document ID: {job?.document_id ?? "waiting for audit"}</p>
           <p>Status: {job?.status ?? "not started"}</p>
           <p>Rejected candidates: {job?.rejected_count ?? 0}</p>
+          {job ? (
+            <div className="pdf-preview-panel">
+              <PdfEvidenceViewer jobId={job.job_id} selectedEvidence={selectedEvidence} />
+              {selectedEvidence ? (
+                <div className="highlight-card">
+                  <strong>Active evidence highlight</strong>
+                  <span>Page {selectedEvidence.page_number}</span>
+                  <span>Block {selectedEvidence.block_id}</span>
+                  <span>{formatBBox(selectedEvidence.bbox)}</span>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </div>
 
         <div className="glass-panel findings-panel">
@@ -287,6 +305,12 @@ export function App() {
                       {evidence.block_id}
                       <br />
                       <strong>BBox:</strong> {formatBBox(evidence.bbox)}
+                      <button
+                        className="secondary-button compact-button evidence-highlight-button"
+                        onClick={() => setSelectedEvidence(evidence)}
+                      >
+                        Highlight in PDF
+                      </button>
                     </div>
                   ))}
                   <p className="suggestion-copy">Suggestion: {finding.suggestion}</p>

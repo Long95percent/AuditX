@@ -1,0 +1,1 @@
+{"document_id": "parsed_doc_001", "filename": "D:\\github_desktop\\AuditX\\backend\\tests\\fixtures\\demo_resume.pdf", "pages": [{"page_number": 1, "width": 893, "height": 1263, "blocks": [{"block_id": "p1_ocr_1", "page_number": 1, "block_type": "paragraph", "text": "精准高亮文本", "bbox": {"x0": 10, "y0": 20, "x1": 110, "y1": 50}}]}]}

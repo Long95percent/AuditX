@@ -17,6 +17,27 @@ export interface Evidence {
   end_offset?: number | null;
 }
 
+export interface LayoutBlock {
+  block_id: string;
+  page_number: number;
+  block_type: string;
+  text: string;
+  bbox: BBox;
+}
+
+export interface DocumentPage {
+  page_number: number;
+  width: number;
+  height: number;
+  blocks: LayoutBlock[];
+}
+
+export interface ParsedDocument {
+  document_id: string;
+  filename: string;
+  pages: DocumentPage[];
+}
+
 export interface AuditFinding {
   finding_id: string;
   rule_id: string;
@@ -49,6 +70,15 @@ export interface ScoringSignal {
   source_step: string;
   source_agent: string;
   reason: string;
+}
+
+export interface ArtifactRef {
+  artifact_uri: string;
+  artifact_type: string;
+  content_type: string;
+  sha256: string;
+  size_bytes: number;
+  created_at: string;
 }
 
 export type ReviewStepStatus = "started" | "accepted" | "rejected" | "failed";
@@ -106,5 +136,6 @@ export interface AuditJob {
   rejected_candidates: FindingCandidate[];
   score?: ScoreResult | null;
   trace: ReviewTrace;
+  artifacts: ArtifactRef[];
   error?: string | null;
 }

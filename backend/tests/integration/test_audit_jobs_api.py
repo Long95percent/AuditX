@@ -9,7 +9,12 @@ from auditx.main import create_app
 FIXTURES_DIR = Path("backend/tests/fixtures")
 
 
-def test_audit_job_api_creates_job_task_and_returns_findings() -> None:
+def test_audit_job_api_creates_job_task_and_returns_findings(monkeypatch) -> None:
+    monkeypatch.setenv("AUDITX_OCR_PROVIDER", "fake")
+    get_settings.cache_clear()
+    from auditx.api.dependencies import get_audit_job_service
+
+    get_audit_job_service.cache_clear()
     client = TestClient(create_app())
     document_path = FIXTURES_DIR / "demo_resume.pdf"
 
@@ -26,12 +31,18 @@ def test_audit_job_api_creates_job_task_and_returns_findings() -> None:
     job_id = payload["job_id"]
     job_response = client.get(f"/api/audit-jobs/{job_id}")
     findings_response = client.get(f"/api/audit-jobs/{job_id}/findings")
+    document_response = client.get(f"/api/audit-jobs/{job_id}/document")
+    parsed_document_response = client.get(f"/api/audit-jobs/{job_id}/parsed-document")
 
     assert job_response.status_code == 200
     job_payload = job_response.json()
     assert job_payload["job_id"] == job_id
     assert job_payload["status"] == "completed"
     assert job_payload["document_id"] == "fake_doc_001"
+    assert any(
+        artifact["artifact_type"] == "source_document"
+        for artifact in job_payload["artifacts"]
+    )
     assert len(job_payload["findings"]) == 2
     assert len(job_payload["candidates"]) == 4
     assert job_payload["score"]["total_score"] >= 0
@@ -74,8 +85,59 @@ def test_audit_job_api_creates_job_task_and_returns_findings() -> None:
         for step in job_payload["trace"]["steps"]
     )
     assert findings_response.status_code == 200
+    assert document_response.status_code == 200
+    assert document_response.content == document_path.read_bytes()
+    assert parsed_document_response.status_code == 404
+    assert parsed_document_response.json()["detail"] == "Parsed document artifact not found"
     returned_rule_ids = {finding["rule_id"] for finding in findings_response.json()["findings"]}
     assert "hr.timeline.fake_risk" in returned_rule_ids
+
+
+def test_audit_job_api_returns_parsed_document_artifact(monkeypatch) -> None:
+    monkeypatch.setenv("AUDITX_OCR_PROVIDER", "fake")
+    monkeypatch.setenv("AUDITX_STORAGE_DIR", "backend/tests/.tmp/api-parsed-artifact")
+    get_settings.cache_clear()
+    from auditx.api.dependencies import get_audit_job_service
+
+    get_audit_job_service.cache_clear()
+    client = TestClient(create_app())
+    service = get_audit_job_service()
+    document_path = (FIXTURES_DIR / "demo_resume.pdf").resolve()
+    job = service.create(str(document_path))
+    parsed_payload = {
+        "document_id": "parsed_doc_001",
+        "filename": str(document_path),
+        "pages": [
+            {
+                "page_number": 1,
+                "width": 893,
+                "height": 1263,
+                "blocks": [
+                    {
+                        "block_id": "p1_ocr_1",
+                        "page_number": 1,
+                        "block_type": "paragraph",
+                        "text": "精准高亮文本",
+                        "bbox": {"x0": 10, "y0": 20, "x1": 110, "y1": 50},
+                    }
+                ],
+            }
+        ],
+    }
+    artifact = service.artifact_store.write_json(
+        owner_type="job",
+        owner_id=job.job_id,
+        artifact_type="parsed_document",
+        filename="parsed_document.json",
+        payload=parsed_payload,
+    )
+    job.artifacts.append(artifact)
+    service.repository.save(job)
+
+    response = client.get(f"/api/audit-jobs/{job.job_id}/parsed-document")
+
+    assert response.status_code == 200
+    assert response.json() == parsed_payload
 
 
 def test_audit_job_api_rejects_missing_file() -> None:
@@ -121,6 +183,7 @@ def test_audit_job_api_rejects_file_outside_allowed_roots(monkeypatch) -> None:
 
 def test_audit_job_api_persists_job_across_service_recreation(monkeypatch) -> None:
     monkeypatch.setenv("AUDITX_STORAGE_DIR", "backend/tests/.repo_tmp/api_persistence")
+    monkeypatch.setenv("AUDITX_OCR_PROVIDER", "fake")
     get_settings.cache_clear()
     from auditx.api.dependencies import get_audit_job_service
 
