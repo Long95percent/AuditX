@@ -3,6 +3,7 @@ import inspect
 from pathlib import Path
 from typing import Protocol
 from uuid import uuid4
+from datetime import datetime, timezone
 
 from pydantic import BaseModel, Field
 
@@ -62,10 +63,12 @@ class AuditJobService:
         use_case: AuditUseCase,
         repository: AuditJobRepository | None = None,
         artifact_store: FileSystemArtifactStore | None = None,
+        result_indexer=None,
     ) -> None:
         self.use_case = use_case
         self.repository = repository or InMemoryAuditJobRepository()
         self.artifact_store = artifact_store
+        self.result_indexer = result_indexer
 
     def create(self, file_path: str) -> AuditJob:
         job = AuditJob(job_id=str(uuid4()), file_path=file_path, status=AuditJobStatus.pending)
@@ -111,6 +114,8 @@ class AuditJobService:
         job.score = result.score
         job.trace = result.trace
         job.artifacts.extend(result.artifacts)
+        if self.result_indexer is not None:
+            self.result_indexer.index_completed_job(job, indexed_at=datetime.now(timezone.utc))
 
     def _run_use_case(self, job: AuditJob) -> AuditResult:
         parameters = inspect.signature(self.use_case.run).parameters

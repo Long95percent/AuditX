@@ -9,15 +9,22 @@ import type { Evidence, ParsedDocument } from "../types/audit";
 GlobalWorkerOptions.workerSrc = workerUrl;
 
 interface PdfEvidenceViewerProps {
-  jobId: string;
+  jobId?: string;
   selectedEvidence: Evidence | null;
+  documentUrl?: string;
+  loadParsedDocument?: () => Promise<ParsedDocument>;
 }
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(Math.max(value, min), max);
 }
 
-export function PdfEvidenceViewer({ jobId, selectedEvidence }: PdfEvidenceViewerProps) {
+export function PdfEvidenceViewer({
+  jobId,
+  selectedEvidence,
+  documentUrl: providedDocumentUrl,
+  loadParsedDocument,
+}: PdfEvidenceViewerProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);
   const [parsedDocument, setParsedDocument] = useState<ParsedDocument | null>(null);
@@ -25,7 +32,10 @@ export function PdfEvidenceViewer({ jobId, selectedEvidence }: PdfEvidenceViewer
   const [renderSize, setRenderSize] = useState({ width: 1, height: 1 });
   const [error, setError] = useState<string | null>(null);
 
-  const documentUrl = useMemo(() => getAuditJobDocumentUrl(jobId), [jobId]);
+  const documentUrl = useMemo(
+    () => providedDocumentUrl ?? (jobId ? getAuditJobDocumentUrl(jobId) : ""),
+    [jobId, providedDocumentUrl],
+  );
   const currentPageLayout = parsedDocument?.pages.find((page) => page.page_number === pageNumber);
 
   useEffect(() => {
@@ -37,9 +47,12 @@ export function PdfEvidenceViewer({ jobId, selectedEvidence }: PdfEvidenceViewer
 
     async function loadDocument() {
       try {
+        if (!documentUrl) {
+          throw new Error("Missing PDF document URL");
+        }
         const [nextPdf, nextParsedDocument] = await Promise.all([
           getDocument(documentUrl).promise,
-          getAuditJobParsedDocument(jobId),
+          loadParsedDocument ? loadParsedDocument() : getAuditJobParsedDocument(jobId ?? ""),
         ]);
         if (!cancelled) {
           setPdf(nextPdf);
@@ -56,7 +69,7 @@ export function PdfEvidenceViewer({ jobId, selectedEvidence }: PdfEvidenceViewer
     return () => {
       cancelled = true;
     };
-  }, [documentUrl, jobId, selectedEvidence?.page_number]);
+  }, [documentUrl, jobId, loadParsedDocument, selectedEvidence?.page_number]);
 
   useEffect(() => {
     if (selectedEvidence) {

@@ -12,6 +12,7 @@ import {
   type OpenAISettingsStatus,
 } from "../api/auditJobs";
 import type { AuditJob, Evidence, JobTemplate } from "../types/audit";
+import { BatchScreeningWorkspace } from "./BatchScreeningWorkspace";
 import { PdfEvidenceViewer } from "./PdfEvidenceViewer";
 
 function formatBBox(bbox: { x0: number; y0: number; x1: number; y1: number }) {
@@ -47,6 +48,7 @@ function displayFileName(filePath: string | null) {
 }
 
 export function App() {
+  const [activeWorkspace, setActiveWorkspace] = useState<"single" | "batch">("single");
   const [selectedFilePath, setSelectedFilePath] = useState<string | null>(null);
   const [job, setJob] = useState<AuditJob | null>(null);
   const [health, setHealth] = useState<HealthStatus | null>(null);
@@ -198,6 +200,18 @@ export function App() {
           and Tauri sidecar orchestration.
         </p>
         <div className="audit-action-row">
+          <button
+            className={activeWorkspace === "single" ? "primary-button" : "secondary-button"}
+            onClick={() => setActiveWorkspace("single")}
+          >
+            Single Review
+          </button>
+          <button
+            className={activeWorkspace === "batch" ? "primary-button" : "secondary-button"}
+            onClick={() => setActiveWorkspace("batch")}
+          >
+            Batch Workspace
+          </button>
           <button className="secondary-button" disabled={isPickingFile} onClick={handleChooseFile}>
             {isPickingFile ? "Choosing Document..." : "Choose Document"}
           </button>
@@ -223,7 +237,9 @@ export function App() {
         {error ? <div className="error-panel">{error}</div> : null}
       </section>
 
-      <section className="workspace-grid">
+      {activeWorkspace === "batch" ? <BatchScreeningWorkspace /> : null}
+
+      {activeWorkspace === "single" ? <section className="workspace-grid">
         <div className="glass-panel review-summary-panel">
           <p className="panel-label">HR Review Summary</p>
           {job?.score ? (
@@ -399,7 +415,7 @@ export function App() {
             <p className="muted-copy">No rejected candidates yet.</p>
           )}
         </div>
-      </section>
+      </section> : null}
 
       {isTestCenterOpen ? (
         <div className="acceptance-backdrop" role="dialog" aria-modal="true" aria-label="验收测试中心">

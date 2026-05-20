@@ -120,3 +120,96 @@
 - 红线：不把批量逻辑塞进 `AuditJob.payload`，不把大对象塞进数据库主表，不在没有批次、队列、失败隔离、Top N、压测证据前宣称支持大批量并行。
 - Mock/延后边界：LLM 真实接入、复杂 Agent、自主 tool runtime、并发 worker、压测报告均延后；后续代码阶段必须遵守 TDD。
 - 验证：本轮为文档设计交付，未运行后端测试和前端构建；进入代码修改阶段后再运行 `uv run pytest backend/tests -q -p no:cacheprovider` 与 `npm.cmd --prefix frontend run build`。
+
+## 批量筛选领域与存储边界切片
+
+- 本次范围：按 TDD 先做批量系统最小领域契约、内存 repository seam 和 application service 边界，不接 Agent，不落 SQLite，不改前端。
+- 新增领域对象：`CandidateProfile`、`CandidateScoreRecord`、`CandidateFindingRecord`、`EvidenceIndexRecord`、`BatchRecord`、`BatchCandidate`，明确候选人画像、分数、风险、证据索引、批次和批次候选人职责。
+- 新增存储 seam：`InMemoryResumeRepository`、`InMemoryCandidateRepository`、`InMemoryEvidenceRepository`、`InMemoryBatchRepository`，当前只保存结构化摘要和 artifact uri，不保存 OCR raw、parsed document 或 PDF 内容。
+- 新增服务边界：`ResumeLibraryService`、`CandidateQueryService`、`BatchReviewService`，分别负责简历入库元信息、候选人查询/Top N、批次创建/候选人状态隔离。
+- 红线保持：批量状态不进入 `AuditJob.payload`；批次失败隔离先体现在 `BatchCandidate.status/error`，不影响 `BatchRecord` 主状态；大对象继续留在 artifact store。
+- TDD 记录：先写 `test_batch_domain_contracts.py`、`test_batch_repository_contracts.py`、`test_batch_application_services.py`，均先因模块不存在失败，再实现最小代码通过。
+- 当前仍未完成：SQLite 落表、API routes、前端简历库/候选人表格/批次 UI、并发 worker、真实批量运行、压测证据。
+
+## 批量筛选 API 边界切片
+
+- 本次范围：在已有领域/service/repository seam 上新增最小 API 边界，仍使用内存 repository，不落 SQLite，不接 Agent，不声明批量并行能力。
+- 新增依赖注入：`get_resume_library_service()`、`get_candidate_query_service()`、`get_batch_review_service()`，为后续 SQLite repository 替换保留清晰 seam。
+- 新增路由：`routes_resumes.py` 提供简历元信息入库和列表；`routes_candidates.py` 提供候选人列表和 Top N 查询；`routes_batches.py` 提供批次创建、添加候选人、候选人失败标记和批次详情。
+- API 边界：返回结构化摘要和 artifact uri，不返回 PDF、OCR raw、parsed document 大对象；批次候选人失败只写 item 状态和 error。
+- TDD 记录：先写 `test_batch_system_api.py`，先因依赖/路由不存在失败，再实现路由和依赖，定向 API 测试通过。
+- 当前仍未完成：API 持久化、分页/筛选完整参数、候选人详情、evidence lookup、前端工作台、真实批量 worker 和失败重试。
+
+## 批量筛选 SQLite 持久化切片
+
+- 本次范围：把批量系统 repository seam 补上 SQLite 实现，并将简历/候选人/批次 API 依赖切到同一个 `auditx.sqlite3`，不接 Agent，不做 worker。
+- 存储设计：按职责拆表为 `resumes`、`candidate_profiles`、`candidate_scores`、`candidate_findings`、`evidence_index`、`batches`、`batch_candidates`，不复用 `audit_jobs.payload` 承载批量状态。
+- 表内容边界：SQLite 表保存结构化索引字段和 Pydantic payload；PDF、OCR raw、parsed document 等大对象仍只通过 artifact uri 引用。
+- 新增测试：`test_batch_sqlite_repositories.py` 验证新 repository 实例可读取旧实例写入的简历、候选人分数、证据索引、批次和批次候选人状态。
+- API 接入：`get_resume_library_service()`、`get_candidate_query_service()`、`get_batch_review_service()` 现在使用 `SQLiteResumeRepository`、`SQLiteCandidateRepository`、`SQLiteBatchRepository`。
+- 当前仍未完成：把单份审查完成结果自动沉淀到 resume/candidate/evidence 表、候选人详情/evidence lookup API、前端批量工作台、并发队列和压测证据。
+
+## 单份审查结果沉淀切片
+
+- 本次范围：完成单份审查结果到简历库/候选人/证据索引表的最小自动沉淀，不改变单份审查主链路，不接 Agent，不做批量 worker。
+- 新增 `ReviewResultIndexer`：只在 `AuditJobStatus.completed` 后把 `AuditJob` 投影为 `ResumeRecord`、`CandidateProfile`、`CandidateScoreRecord`、`CandidateFindingRecord`、`EvidenceIndexRecord`。
+- 存储边界：indexer 只写结构化摘要和 artifact uri；source PDF、OCR raw、parsed document 仍在 artifact store，不复制到候选人或证据表。
+- `AuditJobService` 增加可选 `result_indexer`，无 indexer 时保持旧行为；依赖层将单份审查服务注入同一个 `auditx.sqlite3` 的 resume/candidate/evidence repositories。
+- TDD 记录：先写 `test_review_result_indexer.py` 和单份审查到候选人 API 可见的集成测试，先失败再实现 indexer 与依赖注入。
+- 当前仍未完成：候选人详情 API、按 evidence id 查询、前端批量工作台、批次运行时从候选人库选取 Top N、并发和失败重试。
+
+## 候选人详情与 Evidence Lookup API 切片
+
+- 本次范围：补候选人详情和 evidence lookup API，服务前端后续复核；不新增 Agent、不做批次 worker、不改变 artifact 大对象边界。
+- 新增查询能力：`CandidateQueryService.get_candidate()` 返回候选人画像、分数记录、finding 记录，保持候选人详情只来自结构化查询表。
+- 新增 API：`GET /api/candidates/{candidate_id}` 返回候选人详情；`GET /api/candidates/{candidate_id}/evidence` 返回候选人 evidence index 列表；缺失候选人返回 404。
+- 新增依赖：`get_batch_evidence_repository()` 暴露独立 evidence repository，避免把证据查询塞进 candidate repository。
+- 存储边界：evidence API 返回 page/block/text excerpt/bbox/artifact uri，不返回 parsed document 或 OCR raw 内容。
+- TDD 记录：先扩展 `test_batch_system_api.py`，因依赖缺失失败，再实现 service/route 后通过。
+- 当前仍未完成：前端候选人详情页、PDF evidence 复核联动、批次 Top N 重算、并发 worker 和压测证据。
+
+## 前端批量工作台骨架切片
+
+- 本次范围：新增前端批量工作台信息架构骨架，读取真实 API / SQLite 数据；不伪装并发 worker、自动批量运行或压测能力。
+- 新增类型：`frontend/src/types/resumeLibrary.ts` 定义简历、候选人、分数、finding、evidence index、批次和批次候选人类型。
+- 新增 API client：`frontend/src/api/resumeLibrary.ts` 调用简历列表、候选人列表/详情/evidence、批次创建、添加候选人和批次详情接口。
+- 新增 UI：`BatchScreeningWorkspace` 显示简历库、候选人表格、候选人详情/evidence index、草稿批次；主 `App` 增加 Single Review / Batch Workspace 切换。
+- UI 边界：工作台文案明确当前只展示真实数据和草稿批次，尚未接并发 worker、自动批量运行、Top N 重算或压测证明。
+- 验证：前端无测试框架配置，本切片用 TypeScript + Vite build 验证类型和构建；后续如增加前端测试框架再补组件测试。
+- 当前仍未完成：PDF evidence 高亮与候选人详情联动、批次 Top N 重算、批量运行状态机前端、失败重试和压测报告展示。
+
+## 批次 Top N 排名切片
+
+- 本次范围：为已创建的批次增加基于候选人分数的 `rerank/top-n` 能力，不接 Agent，不做并发 worker，不处理大对象。
+- 排名规则：批次候选人按最新 `CandidateScoreRecord.total_score` 降序、`risk_count` 升序、`candidate_id` 稳定排序；Top N 标记为 `shortlisted`，其余标记为 `eliminated`。
+- 写回结果：`BatchCandidate` 写入 `rank`、`score_id`、`included_reason` 或 `eliminated_reason`；`BatchRecord.status` 更新为 `completed`。
+- 新增 API：`POST /api/batches/{batch_id}/rerank` 和 `GET /api/batches/{batch_id}/top-n`；依赖层把 batch service 接入同库 candidate repository。
+- 前端更新：批量工作台新增 `Rerank Top 10`，显示 rank、score_id、入围/淘汰原因和当前 Top N。
+- TDD 记录：先写 service/API 排名测试，因构造参数/路由缺失失败，再实现服务、路由和前端 client。
+- 当前仍未完成：真正批量运行审查、并发队列、失败 retry、候选人详情 PDF 高亮联动、压测报告。
+
+## 批量工作台系统骨架补强
+
+- 本次范围：按用户要求先跳过新增测试，继续补系统搭建骨架；保留现有回归和构建验证。
+- 后端补强：`BatchReviewService.list_batches()` 与 `GET /api/batches`，让前端可以选择已有批次，而不是只操作当前新建批次。
+- 候选人查询补强：`GET /api/candidates` 增加 `min_score`、`max_risk_count` 查询参数，继续保持查询只基于结构化 `candidate_scores`。
+- 前端补强：批量工作台新增批次列表/选择、候选人 layer/min score/max risk 筛选、已有批次加载、rerank 后 Top N 展示。
+- 边界：仍不接 Agent、不做并发 worker、不伪装批量自动运行；系统现在是“可查询、可建批次、可加候选人、可排名”的批量骨架。
+- 当前仍未完成：文件级批量导入、批量审查 worker、失败 retry、候选人 PDF evidence 联动、压测报告。
+
+## 批量系统剩余骨架补齐
+
+- 本次范围：除压测报告外，补齐文件级批量导入、同步批量审查运行、失败 retry、候选人 evidence 与 PDF 高亮联动；继续跳过新增测试，只跑现有回归和前端构建。
+- 批量导入：新增 `POST /api/batches/{batch_id}/import-files`，把多个本地文件路径登记为候选人画像并加入批次，保留 `source_file_path`，不复制文件内容到数据库。
+- 批量运行：新增 `POST /api/batches/{batch_id}/run`，同步复用现有 `AuditJobService.create_and_run()` 逐个处理 pending/failed 候选人，单个失败写入 `BatchCandidate.error`。
+- 失败 retry：新增 `POST /api/batches/{batch_id}/retry-failed`，把 failed 候选人重置为 pending，供再次运行。
+- 结果合并：批量运行完成后把审查产生的 profile/score/finding/evidence 投影合并回导入候选人的 `candidate_id`，便于批次 rerank 和详情复核。
+- PDF 联动：候选人 profile 新增 `review_session_id`、`source_file_path`；新增候选人 document/parsed-document API；前端候选人详情可点击 evidence 并复用 `PdfEvidenceViewer` 做高亮。
+- 前端补强：批量工作台新增 Import Files、Run Pending、Retry Failed 按钮；候选人详情显示 PDF evidence 高亮入口。
+- 边界：当前是同步本地批量运行，不是并发队列；仍未做压测报告，也未接 Agent 自主评估。
+
+## 前端批量工作台验收文档
+
+- 新增 `docs/acceptance/frontend-batch-workspace-acceptance.md`，说明如何启动后端/前端并验收 Single Review 与 Batch Workspace。
+- 文档覆盖：单份审查、结果沉淀、候选人筛选、批次创建、Top N、批量文件导入、同步运行、失败 retry、候选人 PDF evidence 高亮。
+- 文档明确当前边界：不验收压测报告、不验收并发 worker、不验收 Agent 自主规划、不验收真实 LLM 评估闭环。
